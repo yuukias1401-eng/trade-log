@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>トレードログ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a1d2e;
+      border-bottom: 1px solid #2d3148;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    header h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #7c8cf8;
+    }
+
+    header span {
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-left: auto;
+    }
+
+    .container { padding: 20px; max-width: 600px; margin: 0 auto; }
+
+    /* 追加フォーム */
+    .add-card {
+      background: #1a1d2e;
+      border: 1px solid #2d3148;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .add-card h2 {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+    .form-row.one { grid-template-columns: 1fr; }
+
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+
+    label {
+      font-size: 0.75rem;
+      color: #64748b;
+    }
+
+    input {
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #e2e8f0;
+      font-size: 0.95rem;
+      width: 100%;
+      transition: border-color 0.2s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #7c8cf8;
+    }
+
+    input::placeholder { color: #374151; }
+
+    .btn-add {
+      width: 100%;
+      background: #7c8cf8;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.2s;
+    }
+
+    .btn-add:hover { background: #6366f1; }
+
+    /* ウォッチリスト */
+    .section-title {
+      font-size: 0.85rem;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+
+    .stock-card {
+      background: #1a1d2e;
+      border: 1px solid #2d3148;
+      border-radius: 16px;
+      padding: 18px 20px;
+      margin-bottom: 12px;
+      position: relative;
+    }
+
+    .stock-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .stock-name {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #e2e8f0;
+    }
+
+    .stock-code {
+      font-size: 0.8rem;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .price-big {
+      text-align: right;
+    }
+
+    .current-price {
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+
+    .change-rate {
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .up { color: #f87171; }
+    .down { color: #34d399; }
+    .flat { color: #94a3b8; }
+
+    .price-bars {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .price-bar {
+      background: #0f1117;
+      border-radius: 8px;
+      padding: 8px 10px;
+      text-align: center;
+    }
+
+    .price-bar-label {
+      font-size: 0.65rem;
+      color: #64748b;
+      margin-bottom: 2px;
+    }
+
+    .price-bar-value {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .target { color: #7c8cf8; }
+    .buy { color: #94a3b8; }
+    .loss { color: #f87171; }
+
+    .stock-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .memo-text {
+      font-size: 0.8rem;
+      color: #64748b;
+      flex: 1;
+    }
+
+    .btn-group { display: flex; gap: 8px; }
+
+    .btn-price {
+      background: #2d3148;
+      color: #94a3b8;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-price:hover { background: #3d4168; color: #e2e8f0; }
+
+    .btn-delete {
+      background: transparent;
+      color: #374151;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-delete:hover { border-color: #f87171; color: #f87171; }
+
+    /* 現在値更新モーダル */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: #1a1d2e;
+      border: 1px solid #2d3148;
+      border-radius: 16px;
+      padding: 24px;
+      width: 100%;
+      max-width: 320px;
+    }
+
+    .modal h3 { margin-bottom: 16px; font-size: 1rem; }
+
+    .modal input {
+      margin-bottom: 12px;
+      font-size: 1.2rem;
+      text-align: center;
+    }
+
+    .modal-btns { display: flex; gap: 8px; }
+
+    .btn-cancel {
+      flex: 1;
+      background: #2d3148;
+      color: #94a3b8;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+
+    .btn-ok {
+      flex: 2;
+      background: #7c8cf8;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: #374151;
+      padding: 40px 20px;
+      font-size: 0.95rem;
+    }
+
+    .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
+
+    @media (max-width: 400px) {
+      .form-row.three { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📈 トレードログ</h1>
+  <span id="lastUpdate"></span>
+</header>
+
+<div class="container">
+
+  <!-- 追加フォーム -->
+  <div class="add-card">
+    <h2>銘柄を追加</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>銘柄コード</label>
+        <input type="text" id="inp-code" placeholder="例: 7203">
+      </div>
+      <div class="form-group">
+        <label>銘柄名</label>
+        <input type="text" id="inp-name" placeholder="例: トヨタ">
+      </div>
+    </div>
+    <div class="form-row three">
+      <div class="form-group">
+        <label>購入価格 (円)</label>
+        <input type="number" id="inp-buy" placeholder="3500">
+      </div>
+      <div class="form-group">
+        <label>目標価格 (円)</label>
+        <input type="number" id="inp-target" placeholder="4000">
+      </div>
+      <div class="form-group">
+        <label>損切ライン (円)</label>
+        <input type="number" id="inp-loss" placeholder="3200">
+      </div>
+    </div>
+    <div class="form-row one">
+      <div class="form-group">
+        <label>メモ（任意）</label>
+        <input type="text" id="inp-memo" placeholder="例: 決算前の押し目買い">
+      </div>
+    </div>
+    <button class="btn-add" onclick="addStock()">＋ ウォッチリストに追加</button>
+  </div>
+
+  <!-- ウォッチリスト -->
+  <div class="section-title">ウォッチリスト</div>
+  <div id="watchlist"></div>
+
+</div>
+
+<!-- 現在値更新モーダル -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3 id="modal-title">現在値を更新</h3>
+    <input type="number" id="modal-price" placeholder="現在の株価">
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+      <button class="btn-ok" onclick="updatePrice()">更新</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let stocks = JSON.parse(localStorage.getItem('watchlist') || '[]');
+  let editingId = null;
+
+  function save() {
+    localStorage.setItem('watchlist', JSON.stringify(stocks));
+  }
+
+  function addStock() {
+    const code = document.getElementById('inp-code').value.trim();
+    const name = document.getElementById('inp-name').value.trim();
+    const buy  = parseFloat(document.getElementById('inp-buy').value);
+    const target = parseFloat(document.getElementById('inp-target').value);
+    const loss = parseFloat(document.getElementById('inp-loss').value);
+    const memo = document.getElementById('inp-memo').value.trim();
+
+    if (!name || isNaN(buy)) {
+      alert('銘柄名と購入価格は必須です');
+      return;
+    }
+
+    stocks.push({
+      id: Date.now(),
+      code, name, buy,
+      target: isNaN(target) ? null : target,
+      loss: isNaN(loss) ? null : loss,
+      current: buy,
+      memo,
+      updatedAt: new Date().toLocaleString('ja-JP')
+    });
+
+    save();
+    render();
+
+    // フォームリセット
+    ['inp-code','inp-name','inp-buy','inp-target','inp-loss','inp-memo']
+      .forEach(id => document.getElementById(id).value = '');
+  }
+
+  function deleteStock(id) {
+    if (!confirm('削除しますか？')) return;
+    stocks = stocks.filter(s => s.id !== id);
+    save();
+    render();
+  }
+
+  function openModal(id) {
+    editingId = id;
+    const s = stocks.find(s => s.id === id);
+    document.getElementById('modal-title').textContent = `${s.name} の現在値を更新`;
+    document.getElementById('modal-price').value = s.current;
+    document.getElementById('modal').classList.add('open');
+    setTimeout(() => document.getElementById('modal-price').focus(), 100);
+  }
+
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+    editingId = null;
+  }
+
+  function updatePrice() {
+    const price = parseFloat(document.getElementById('modal-price').value);
+    if (isNaN(price)) { alert('価格を入力してください'); return; }
+    const s = stocks.find(s => s.id === editingId);
+    s.current = price;
+    s.updatedAt = new Date().toLocaleString('ja-JP');
+    save();
+    render();
+    closeModal();
+  }
+
+  function render() {
+    const el = document.getElementById('watchlist');
+
+    if (stocks.length === 0) {
+      el.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">📋</div>
+          上のフォームから銘柄を追加してください
+        </div>`;
+      return;
+    }
+
+    el.innerHTML = stocks.map(s => {
+      const diff = s.current - s.buy;
+      const rate = ((diff / s.buy) * 100).toFixed(2);
+      const rateClass = diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat';
+      const rateSign = diff > 0 ? '+' : '';
+      const rateText = `${rateSign}${rate}%`;
+
+      return `
+        <div class="stock-card">
+          <div class="stock-header">
+            <div>
+              <div class="stock-name">${s.name}</div>
+              <div class="stock-code">${s.code || '---'}</div>
+            </div>
+            <div class="price-big">
+              <div class="current-price ${rateClass}">¥${s.current.toLocaleString()}</div>
+              <div class="change-rate ${rateClass}">${rateText}</div>
+            </div>
+          </div>
+
+          <div class="price-bars">
+            <div class="price-bar">
+              <div class="price-bar-label">購入価格</div>
+              <div class="price-bar-value buy">¥${s.buy.toLocaleString()}</div>
+            </div>
+            <div class="price-bar">
+              <div class="price-bar-label">目標価格</div>
+              <div class="price-bar-value target">${s.target ? '¥' + s.target.toLocaleString() : '---'}</div>
+            </div>
+            <div class="price-bar">
+              <div class="price-bar-label">損切ライン</div>
+              <div class="price-bar-value loss">${s.loss ? '¥' + s.loss.toLocaleString() : '---'}</div>
+            </div>
+          </div>
+
+          <div class="stock-footer">
+            <div class="memo-text">${s.memo || ''}</div>
+            <div class="btn-group">
+              <button class="btn-price" onclick="openModal(${s.id})">値を更新</button>
+              <button class="btn-delete" onclick="deleteStock(${s.id})">削除</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('lastUpdate').textContent =
+      new Date().toLocaleString('ja-JP', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'});
+  }
+
+  // Enterキーでモーダルを閉じる
+  document.getElementById('modal-price').addEventListener('keydown', e => {
+    if (e.key === 'Enter') updatePrice();
+    if (e.key === 'Escape') closeModal();
+  });
+
+  render();
+</script>
+</body>
+</html>
