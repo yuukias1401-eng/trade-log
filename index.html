@@ -589,9 +589,12 @@ window.importFromFile = async function(input) {
       const data = JSON.parse(e.target.result);
       const items = Array.isArray(data) ? data : data.stocks;
       if (!items || !items.length) { showToast('データが見つかりませんでした', true); return; }
+      if (stocks.length > 0) {
+        showToast(`⏳ 既存の${stocks.length}件を削除中...`);
+        await Promise.all(stocks.map(s => removeStock(s.id)));
+      }
       let added = 0;
       for (const item of items) {
-        if (stocks.find(s => s.code === item.code && s.name === item.name)) continue;
         const newStock = { ...item, id: String(Date.now() + Math.random()), createdAt: Date.now() };
         await saveStock(newStock);
         added++;
