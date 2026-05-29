@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>資産ダッシュボード</title>
+<title>資産ダッシュボード v6</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
 :root {
@@ -251,7 +251,6 @@ tr.h-short td:first-child { border-left:3px solid #f87171; }
     <div class="header-sub" id="lastUpdated">最終更新: —</div>
   </div>
   <div class="header-actions">
-    <a href="index.html" class="btn btn-ghost" style="text-decoration:none">📈 トレードログ</a>
     <button class="btn btn-ghost" onclick="exportCSV()">📄 CSV出力</button>
     <button class="btn btn-ghost" onclick="exportJSON()">💾 バックアップ</button>
     <button class="btn btn-ghost" onclick="takeSnapshot()">📈 推移グラフ更新</button>
@@ -720,7 +719,75 @@ tr.h-short td:first-child { border-left:3px solid #f87171; }
 
 <div class="toast" id="toast"></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
+// ════════════════════════════════════
+//  Firebase Firestore 連携
+// ════════════════════════════════════
+(function() {
+  firebase.initializeApp({
+    apiKey: 'AIzaSyA1DGiJ6TShj6ZI5_j-vkR5gSKsxEfUwqA',
+    authDomain: 'trade-log-c20dd.firebaseapp.com',
+    projectId: 'trade-log-c20dd',
+    storageBucket: 'trade-log-c20dd.firebasestorage.app',
+    messagingSenderId: '604201650756',
+    appId: '1:604201650756:web:65219ae816bac1e1574a11'
+  });
+  window._db = firebase.firestore();
+})();
+
+window._fbReady = false;
+
+window._fbSaveHoldings = async function() {
+  if (!window._fbReady || !holdings || !holdings.length) return;
+  try {
+    var col = window._db.collection('holdings');
+    for (var i = 0; i < holdings.length; i += 400) {
+      var batch = window._db.batch();
+      holdings.slice(i, i+400).forEach(function(h) { batch.set(col.doc(String(h.id)), h); });
+      await batch.commit();
+    }
+  } catch(e) { console.warn('Firestore holdings save failed:', e); }
+};
+
+window._fbSyncWatchlist = async function(h) {
+  if (!window._fbReady || h.horizon !== 'short') return;
+  var skipCats = ['現金','投信：株','投信：債券','投信：コモディティ','暗号通貨'];
+  if (skipCats.indexOf(h.category) >= 0) return;
+  try {
+    var ref = window._db.collection('watchlist').doc(String(h.id));
+    var snap = await ref.get();
+    if (!snap.exists) {
+      var buy = parseFloat(h.price) || null;
+      await ref.set({
+        id: String(h.id), code: h.ticker||'', name: h.name||'',
+        qty: parseFloat(h.qty)||null, buy: buy,
+        target:  buy ? Math.round(buy * 1.10) : null,
+        loss:    buy ? Math.round(buy * 0.95) : null,
+        current: buy || 0,
+        memo:    (h.account||'') + ' · ダッシュボードから同期',
+        createdAt: Date.now()
+      });
+    }
+  } catch(e) { console.warn('Watchlist sync failed:', e); }
+};
+
+window._fbInit = async function() {
+  try {
+    var snap = await window._db.collection('holdings').limit(1).get();
+    window._fbReady = true;
+    if (snap.empty && holdings && holdings.length > 0) {
+      console.log('Firestore empty — migrating ' + holdings.length + ' holdings...');
+      await window._fbSaveHoldings();
+      console.log('Migration complete!');
+    }
+  } catch(e) {
+    console.warn('Firestore unavailable, localStorage only:', e);
+    window._fbReady = false;
+  }
+};
+// ════════════════════════════════════
 // ═══════════════════════════════
 //  Constants & State
 // ═══════════════════════════════
@@ -992,6 +1059,7 @@ function save() {
   localStorage.setItem('portfolio_v6_fx', JSON.stringify(fxRates));
   localStorage.setItem('portfolio_v6_targets', JSON.stringify(targetAlloc));
   document.getElementById('lastUpdated').textContent = '最終更新: ' + new Date().toLocaleString('ja-JP');
+  if (window._fbReady) window._fbSaveHoldings().catch(function(e){ console.warn(e); });
 }
 function load() {
   // スマホ版エクスポートの埋め込みデータを優先（iOS localStorage制限対策）
@@ -1584,6 +1652,7 @@ function cycleHorizon(id) {
   const cycle={undefined:'long', '':'long', long:'mid', mid:'short', short:''};
   h.horizon=cycle[h.horizon]||'';
   save(); renderBrokerGroups();
+  window._fbSyncWatchlist(h).catch(function(e){ console.warn('watchlist sync:', e); });
 }
 
 function setHorizonFilter(val, btn) {
@@ -3088,6 +3157,7 @@ if(!fxRates.ETH) fxRates.ETH=null;
 if(!fxRates.XRP) fxRates.XRP=null;
 
 renderAll();
+window._fbInit().catch(function(e){ console.warn('fbInit:', e); });
 if(localStorage.getItem('portfolio_v6')){
   document.getElementById('lastUpdated').textContent='最終更新: '+new Date().toLocaleString('ja-JP');
 }
