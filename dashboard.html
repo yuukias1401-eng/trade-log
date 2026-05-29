@@ -768,6 +768,7 @@ window._fbSyncWatchlist = async function(h) {
         loss:    buy ? Math.round(buy * 0.95) : null,
         current: buy || 0,
         memo:    (h.account||'') + ' · ダッシュボードから同期',
+        fromDashboard: true,
         createdAt: Date.now()
       });
     }
@@ -790,17 +791,15 @@ window._syncAllShortToWatchlist = async function() {
 
 window._fbInit = async function() {
   try {
-    var snap = await window._db.collection('holdings').limit(1).get();
+    console.log('[Firebase] 接続テスト中...');
+    // watchlistコレクションで疎通確認（holdingsはセキュリティルール対象外の可能性あり）
+    await window._db.collection('watchlist').limit(1).get();
     window._fbReady = true;
-    if (snap.empty && holdings && holdings.length > 0) {
-      console.log('Firestore empty — migrating ' + holdings.length + ' holdings...');
-      await window._fbSaveHoldings();
-      console.log('Migration complete!');
-    }
+    console.log('[Firebase] 接続成功 ✅');
     // 起動時に短期銘柄を一括同期
     await window._syncAllShortToWatchlist();
   } catch(e) {
-    console.warn('Firestore unavailable, localStorage only:', e);
+    console.error('[Firebase] 接続失敗 ❌:', e.code, e.message, e);
     window._fbReady = false;
   }
 };
