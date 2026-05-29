@@ -404,7 +404,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
-const stocksCol  = collection(db, 'stocks');
+const stocksCol  = collection(db, 'watchlist');
 const historyCol = collection(db, 'history');
 
 let stocks  = [];
@@ -445,11 +445,11 @@ window.switchTab = (tab) => {
 
 async function saveStock(s) {
   setSyncStatus('ing');
-  await setDoc(doc(db, 'stocks', String(s.id)), s);
+  await setDoc(doc(db, 'watchlist', String(s.id)), s);
 }
 async function removeStock(id) {
   setSyncStatus('ing');
-  await deleteDoc(doc(db, 'stocks', String(id)));
+  await deleteDoc(doc(db, 'watchlist', String(id)));
 }
 
 // モーダル
@@ -714,14 +714,16 @@ window.openSettleModal = (id) => {
   document.getElementById('s-reason').value = '';
   document.getElementById('s-memo').value = '';
   document.getElementById('s-pl-preview').style.display = 'none';
-  const diff = s.current - s.buy;
-  const rate = (diff / s.buy * 100).toFixed(2);
+  const buyP = s.buy ?? s.cost ?? 0;
+  const curP  = s.current ?? s.price ?? buyP;
+  const diff = curP - buyP;
+  const rate = buyP > 0 ? (diff / buyP * 100).toFixed(2) : '0.00';
   const rc = diff >= 0 ? 'var(--red)' : 'var(--green)';
   document.getElementById('settle-stock-info').innerHTML = `
-    <div style="font-size:15px;font-weight:700;margin-bottom:6px">${s.name}${s.code ? ' (' + s.code + ')' : ''}</div>
+    <div style="font-size:15px;font-weight:700;margin-bottom:6px">${s.name}${s.code||s.ticker ? ' (' + (s.code||s.ticker) + ')' : ''}</div>
     <div style="display:flex;gap:16px;flex-wrap:wrap">
-      <span>購入価格: <b>¥${s.buy.toLocaleString()}</b></span>
-      <span>現在値: <b style="color:${rc}">¥${s.current.toLocaleString()} (${diff >= 0 ? '+' : ''}${rate}%)</b></span>
+      <span>購入価格: <b>¥${buyP.toLocaleString()}</b></span>
+      <span>現在値: <b style="color:${rc}">¥${curP.toLocaleString()} (${diff >= 0 ? '+' : ''}${rate}%)</b></span>
       ${s.qty ? `<span>株数: <b>${s.qty}株</b></span>` : ''}
     </div>`;
   document.getElementById('settleModal').classList.add('open');
@@ -739,9 +741,10 @@ window.calcSettlePL = () => {
   const sellPrice = parseFloat(document.getElementById('s-price').value);
   const preview = document.getElementById('s-pl-preview');
   if (!s || isNaN(sellPrice) || sellPrice <= 0) { preview.style.display = 'none'; return; }
-  const plPct = ((sellPrice - s.buy) / s.buy * 100).toFixed(2);
-  const plYen = s.qty ? Math.round((sellPrice - s.buy) * s.qty) : null;
-  const isWin = sellPrice >= s.buy;
+  const _buyP = s.buy ?? s.cost ?? 0;
+  const plPct = _buyP > 0 ? ((sellPrice - _buyP) / _buyP * 100).toFixed(2) : '0.00';
+  const plYen = s.qty ? Math.round((sellPrice - _buyP) * s.qty) : null;
+  const isWin = sellPrice >= _buyP;
   preview.style.cssText = `display:block;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:600;font-size:15px;background:${isWin ? 'rgba(74,222,154,.1)' : 'rgba(248,113,113,.1)'};border:1px solid ${isWin ? 'rgba(74,222,154,.3)' : 'rgba(248,113,113,.3)'};color:${isWin ? 'var(--green)' : 'var(--red)'};`;
   preview.textContent = `${isWin ? '📈 利益' : '📉 損失'}: ${isWin ? '+' : ''}${plPct}%${plYen !== null ? ' (' + (isWin ? '+' : '') + '¥' + plYen.toLocaleString() + ')' : ''}`;
 };
@@ -751,8 +754,9 @@ window.submitSettle = async () => {
   if (!s) return;
   const sellPrice = parseFloat(document.getElementById('s-price').value);
   if (isNaN(sellPrice) || sellPrice <= 0) { showToast('決済価格を入力してください', true); return; }
-  const plPct = ((sellPrice - s.buy) / s.buy * 100).toFixed(2);
-  const plYen = s.qty ? Math.round((sellPrice - s.buy) * s.qty) : null;
+  const buyPriceForSettle = s.buy ?? s.cost ?? 0;
+  const plPct = buyPriceForSettle > 0 ? ((sellPrice - buyPriceForSettle) / buyPriceForSettle * 100).toFixed(2) : '0.00';
+  const plYen = s.qty ? Math.round((sellPrice - buyPriceForSettle) * s.qty) : null;
   const historyItem = {
     ...s,
     sellDate: document.getElementById('s-date').value,
@@ -893,14 +897,23 @@ function render() {
   const el=document.getElementById('watchlist');
   if(!stocks.length){ el.innerHTML=`<div class="empty"><div class="icon">📋</div>右下の＋から銘柄を追加してください</div>`; return; }
   el.innerHTML=stocks.map(s=>{
-    const diff=s.current-s.buy;
-    const rate=(diff/s.buy*100).toFixed(2);
+    // ダッシュボードから同期された銘柄はフィールド名が異なる場合がある
+    const buyPrice = s.buy ?? s.cost ?? 0;
+    const currentPrice = s.current ?? s.price ?? buyPrice;
+    const stockCode = s.code ?? s.ticker ?? '';
+    // 表示用にフィールドを正規化
+    if(!s.buy && s.cost) s.buy = s.cost;
+    if(!s.current && s.price) s.current = s.price;
+    if(!s.code && s.ticker) s.code = s.ticker;
+    const diff = currentPrice - buyPrice;
+    const rate = buyPrice > 0 ? (diff/buyPrice*100).toFixed(2) : '0.00';
     const rc=diff>0?'up':diff<0?'down':'flat';
     const sign=diff>0?'+':'';
     const jClass=s.judgment||'none';
     const jLabel=jClass==='green'?'🟢 買い':jClass==='yellow'?'🟡 様子見':jClass==='red'?'🔴 見送り':'— 未判定';
     const condDots=(s.condChecks||[]).map(ok=>`<span class="cond-dot ${ok?'on':'off'}"></span>`).join('');
-    const url=chartUrl(s.code);
+    const fromDash = s.fromDashboard === true;
+    const url=chartUrl(stockCode);
 
     // ゲージバー計算
     let gaugeHTML='';
@@ -931,23 +944,25 @@ function render() {
         </div>`;
     }
 
-    return `<div class="stock-card">
+    return `<div class="stock-card"${fromDash?' style="border-color:rgba(96,165,250,.35)"':''}>
+      ${fromDash?'<div style="font-size:10px;color:var(--blue);background:rgba(96,165,250,.1);border-radius:6px;padding:3px 8px;display:inline-block;margin-bottom:8px">📊 ダッシュボードから同期</div>':''}
       <div class="sc-top">
         <div>
           <div class="sc-name">${s.name}</div>
-          <div class="sc-code">${s.code||'—'}${s.buyDate?' · '+s.buyDate:''}</div>
+          <div class="sc-code">${stockCode||'—'}${s.buyDate?' · '+s.buyDate:''}</div>
         </div>
         <div class="sc-price-block">
-          <div class="sc-current ${rc}">¥${s.current.toLocaleString()}</div>
+          <div class="sc-current ${rc}">¥${currentPrice.toLocaleString()}</div>
           <div class="sc-rate ${rc}">${sign}${rate}%</div>
         </div>
       </div>
       <div class="sc-bars">
-        <div class="sc-bar"><div class="sc-bar-label">購入価格</div><div class="sc-bar-val col-buy">¥${s.buy.toLocaleString()}</div></div>
+        <div class="sc-bar"><div class="sc-bar-label">購入価格</div><div class="sc-bar-val col-buy">¥${buyPrice.toLocaleString()}</div></div>
         <div class="sc-bar"><div class="sc-bar-label">目標価格</div><div class="sc-bar-val col-target">${s.target?'¥'+s.target.toLocaleString():'—'}</div></div>
         <div class="sc-bar"><div class="sc-bar-label">損切ライン</div><div class="sc-bar-val col-loss">${s.loss?'¥'+s.loss.toLocaleString():'—'}</div></div>
       </div>
       ${gaugeHTML}
+      ${fromDash && !s.condChecks?.length ? '<div style="font-size:11px;color:var(--blue);background:rgba(96,165,250,.07);border:1px dashed rgba(96,165,250,.3);border-radius:8px;padding:7px 10px;margin-bottom:8px">💡 5条件・目標価格・損切ラインを設定してください</div>' : ''}
       <span class="sc-judge ${jClass}">${jLabel}</span>
       <div class="sc-cond-mini">${condDots}</div>
       <div class="sc-footer" style="flex-direction:column;align-items:stretch;gap:6px;">
