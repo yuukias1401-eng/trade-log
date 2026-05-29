@@ -15,11 +15,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans JP',sans
 
 header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;}
 header h1{font-size:1.1rem;font-weight:700;color:var(--green);}
+.header-right{display:flex;align-items:center;gap:10px;}
 header span{font-size:11px;color:var(--muted);}
+.sync-status{font-size:11px;padding:3px 8px;border-radius:10px;font-weight:500;}
+.sync-ok{color:var(--green);background:rgba(74,222,154,.1);}
+.sync-err{color:var(--red);background:rgba(248,113,113,.1);}
+.sync-ing{color:var(--yellow);background:rgba(250,204,21,.1);}
 
 .container{max-width:640px;margin:0 auto;padding:16px;}
 
-/* ── フォームカード ── */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px;}
 .card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:14px;}
 
@@ -35,17 +39,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue);}
 input::placeholder{color:#374151;}
 textarea{resize:vertical;min-height:52px;}
 
-/* 自動入力フィールドのハイライト */
 input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 
-/* ── 判定バッジ ── */
 .judgment{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:600;font-size:15px;}
 .judgment.green{background:rgba(74,222,154,.1);border:1px solid rgba(74,222,154,.3);color:var(--green);}
 .judgment.yellow{background:rgba(250,204,21,.1);border:1px solid rgba(250,204,21,.3);color:var(--yellow);}
 .judgment.red{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--red);}
 .judgment.none{background:var(--surface2);border:1px solid var(--border);color:var(--muted);}
 
-/* ── チェックボックス条件 ── */
 .cond-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
 .cond-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);cursor:pointer;transition:border-color .15s;}
 .cond-item:hover{border-color:var(--blue);}
@@ -66,7 +67,6 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 
 .section-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;}
 
-/* ── ボタン ── */
 .btn{padding:10px 16px;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;transition:all .15s;font-family:inherit;}
 .btn-primary{background:var(--green);color:#0d0f14;width:100%;margin-top:6px;}
 .btn-primary:hover{filter:brightness(1.1);}
@@ -78,7 +78,6 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 .btn-price{background:var(--surface2);border:1px solid var(--border);color:var(--muted);}
 .btn-price:hover{border-color:var(--blue);color:var(--blue);}
 
-/* ── ウォッチリスト ── */
 .list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
 .list-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);}
 
@@ -108,7 +107,6 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 .sc-judge.red{background:rgba(248,113,113,.15);color:var(--red);}
 .sc-judge.none{background:var(--surface2);color:var(--muted);}
 
-.sc-meta{font-size:11px;color:var(--muted);margin-bottom:4px;}
 .sc-cond-mini{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;}
 .cond-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
 .cond-dot.on{background:var(--green);}
@@ -118,21 +116,21 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 .sc-memo{font-size:11px;color:var(--muted);flex:1;}
 .sc-btns{display:flex;gap:6px;}
 
-/* ── 空状態 ── */
 .empty{text-align:center;color:var(--muted);padding:40px 20px;font-size:13px;}
 .empty .icon{font-size:2rem;margin-bottom:10px;}
 
-/* ── トースト ── */
 .toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--green);color:var(--green);padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;z-index:999;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;}
 .toast.show{opacity:1;transform:translateY(0);}
 .toast.err{border-color:var(--red);color:var(--red);}
 
-/* ── 詳細モーダル ── */
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;}
 .modal.open{display:flex;}
 .modal-inner{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;width:100%;max-width:560px;margin:auto;}
 .modal-title{font-size:15px;font-weight:700;margin-bottom:18px;color:var(--green);}
 .modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}
+
+.fab{position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:var(--green);color:#0d0f14;border:none;font-size:28px;font-weight:700;cursor:pointer;z-index:150;box-shadow:0 4px 16px rgba(74,222,154,.4);transition:transform .15s,filter .15s;display:flex;align-items:center;justify-content:center;}
+.fab:hover{transform:scale(1.08);filter:brightness(1.1);}
 
 @media(max-width:420px){
   .row3{grid-template-columns:1fr 1fr;}
@@ -144,15 +142,24 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 
 <header>
   <h1>📈 トレードログ</h1>
-  <span id="lastUpdate"></span>
+  <div class="header-right">
+    <span class="sync-status sync-ing" id="syncStatus">⏳ 接続中...</span>
+    <span id="lastUpdate"></span>
+  </div>
 </header>
 
 <div class="container">
+  <div class="list-header">
+    <div class="list-title">ウォッチリスト</div>
+    <button class="btn btn-sm btn-ghost" onclick="updateAllPrices()">📡 株価一括更新</button>
+  </div>
+  <div id="watchlist"></div>
+</div>
 
-  <!-- ── 銘柄追加フォーム ── -->
-  <div class="card">
-    <div class="card-title">銘柄を追加</div>
-
+<!-- 銘柄追加モーダル -->
+<div class="modal" id="addModal">
+  <div class="modal-inner">
+    <div class="modal-title">＋ 銘柄を追加</div>
     <div class="row row2">
       <div class="fg"><label>銘柄コード</label><input id="f-code" placeholder="例: 7203"></div>
       <div class="fg"><label>銘柄名 *</label><input id="f-name" placeholder="例: トヨタ"></div>
@@ -176,21 +183,18 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
       </div>
     </div>
 
-    <!-- 押し目買い5条件 -->
     <div class="section-label" style="margin-top:4px">押し目買い 5条件</div>
-
     <div id="judgment-badge" class="judgment none">
       <span id="judgment-emoji">—</span>
       <span id="judgment-text">チェックを入れると判定が出ます</span>
     </div>
-
     <div class="cond-list">
       <label class="cond-item" id="cond0-wrap">
         <input type="checkbox" id="cond0" onchange="updateJudgment()">
         <div class="cond-body">
           <div class="cond-name">① 上昇トレンド確認</div>
           <div class="cond-desc">日足で75日線が上向き、株価が75日線の上にある</div>
-          <span class="cond-note"><input id="cond0-note" placeholder="具体値メモ（任意）" onclick="e=>e.stopPropagation()"></span>
+          <span class="cond-note"><input id="cond0-note" placeholder="具体値メモ（任意）"></span>
         </div>
       </label>
       <label class="cond-item" id="cond1-wrap">
@@ -198,7 +202,7 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
         <div class="cond-body">
           <div class="cond-name">② 押し目が来ている</div>
           <div class="cond-desc">直近高値から5〜15%下落、25日線付近まで下がってきた</div>
-          <span class="cond-note"><input id="cond1-note" placeholder="例: 高値5200円から-8%、25日線4790円付近" onclick="e=>e.stopPropagation()"></span>
+          <span class="cond-note"><input id="cond1-note" placeholder="例: 高値5200円から-8%、25日線4790円付近"></span>
         </div>
       </label>
       <label class="cond-item" id="cond2-wrap">
@@ -206,7 +210,7 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
         <div class="cond-body">
           <div class="cond-name">③ 反転サイン</div>
           <div class="cond-desc">陽線が1〜3本出た＋その日の出来高が平均より増加</div>
-          <span class="cond-note"><input id="cond2-note" placeholder="例: 陽線2本、出来高1.3倍" onclick="e=>e.stopPropagation()"></span>
+          <span class="cond-note"><input id="cond2-note" placeholder="例: 陽線2本、出来高1.3倍"></span>
         </div>
       </label>
       <label class="cond-item" id="cond3-wrap">
@@ -214,7 +218,7 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
         <div class="cond-body">
           <div class="cond-name">④ 過熱していない</div>
           <div class="cond-desc">RSI 70以下（強いトレンド中は80以上で注意に緩めてもOK）</div>
-          <span class="cond-note"><input id="cond3-note" placeholder="例: RSI 58" onclick="e=>e.stopPropagation()"></span>
+          <span class="cond-note"><input id="cond3-note" placeholder="例: RSI 58"></span>
         </div>
       </label>
       <label class="cond-item" id="cond4-wrap">
@@ -222,12 +226,11 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
         <div class="cond-body">
           <div class="cond-name">⑤ 相場環境が良い</div>
           <div class="cond-desc">VIX 20以下</div>
-          <span class="cond-note"><input id="cond4-note" placeholder="例: VIX 17.2" onclick="e=>e.stopPropagation()"></span>
+          <span class="cond-note"><input id="cond4-note" placeholder="例: VIX 17.2"></span>
         </div>
       </label>
     </div>
 
-    <!-- 加点条件 -->
     <div class="section-label">加点条件</div>
     <div class="bonus-list">
       <label class="bonus-item" id="bonus0-wrap">
@@ -252,19 +255,16 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
       <div class="fg"><label>一言メモ（任意）</label><input id="f-memo" placeholder="例: 決算前の押し目買い、出来高増加中"></div>
     </div>
 
-    <button class="btn btn-primary" onclick="addStock()">＋ ウォッチリストに追加</button>
+    <div class="modal-footer">
+      <button class="btn btn-sm btn-ghost" onclick="closeAddModal()">キャンセル</button>
+      <button class="btn btn-primary" style="width:auto;padding:10px 24px;" onclick="addStock()">追加する</button>
+    </div>
   </div>
-
-  <!-- ── ウォッチリスト ── -->
-  <div class="list-header">
-    <div class="list-title">ウォッチリスト</div>
-    <button class="btn btn-sm btn-ghost" onclick="updateAllPrices()">📡 株価一括更新</button>
-  </div>
-  <div id="watchlist"></div>
-
 </div>
 
-<!-- ── 詳細モーダル ── -->
+<button class="fab" onclick="openAddModal()" title="銘柄を追加">＋</button>
+
+<!-- 詳細モーダル -->
 <div class="modal" id="detailModal">
   <div class="modal-inner">
     <div class="modal-title" id="modal-title">詳細</div>
@@ -277,369 +277,244 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 
 <div class="toast" id="toast"></div>
 
-<script>
-let stocks = JSON.parse(localStorage.getItem('tradelog_v2') || '[]');
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-function save() { localStorage.setItem('tradelog_v2', JSON.stringify(stocks)); }
+const firebaseConfig = {
+  apiKey: "AIzaSyA1DGiJ6TShj6ZI5_j-vkR5gSKsxEfUwqA",
+  authDomain: "trade-log-c20dd.firebaseapp.com",
+  projectId: "trade-log-c20dd",
+  storageBucket: "trade-log-c20dd.firebasestorage.app",
+  messagingSenderId: "604201650756",
+  appId: "1:604201650756:web:65219ae816bac1e1574a11"
+};
 
-// 今日の日付をデフォルトセット
-document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+const stocksCol = collection(db, 'stocks');
 
-// ── 自動入力 ──
-function autoFill(val) {
-  const price = parseFloat(val);
-  if (!price || price <= 0) return;
-  const tgt = document.getElementById('f-target');
-  const sl  = document.getElementById('f-loss');
-  tgt.value = Math.round(price * 1.10);
-  sl.value  = Math.round(price * 0.95);
+let stocks = [];
+
+function setSyncStatus(state) {
+  const el = document.getElementById('syncStatus');
+  if(state==='ok')  { el.textContent='☁️ 同期済み';  el.className='sync-status sync-ok'; }
+  if(state==='ing') { el.textContent='⏳ 同期中...'; el.className='sync-status sync-ing'; }
+  if(state==='err') { el.textContent='❌ オフライン'; el.className='sync-status sync-err'; }
 }
 
-// ── 判定更新 ──
-function updateJudgment() {
-  const count = [0,1,2,3,4].filter(i => document.getElementById('cond'+i).checked).length;
-  const badge = document.getElementById('judgment-badge');
-  const emoji = document.getElementById('judgment-emoji');
-  const text  = document.getElementById('judgment-text');
-
-  badge.className = 'judgment';
-  if (count === 5) {
-    badge.classList.add('green');
-    emoji.textContent = '🟢';
-    text.textContent  = `買い（${count}/5条件クリア）`;
-  } else if (count >= 3) {
-    badge.classList.add('yellow');
-    emoji.textContent = '🟡';
-    text.textContent  = `様子見（${count}/5条件クリア）`;
-  } else if (count > 0) {
-    badge.classList.add('red');
-    emoji.textContent = '🔴';
-    text.textContent  = `見送り（${count}/5条件クリア）`;
-  } else {
-    badge.classList.add('none');
-    emoji.textContent = '—';
-    text.textContent  = 'チェックを入れると判定が出ます';
-  }
-
-  // cond-item の見た目更新
-  [0,1,2,3,4].forEach(i => {
-    const wrap = document.getElementById('cond'+i+'-wrap');
-    wrap.classList.toggle('checked', document.getElementById('cond'+i).checked);
-  });
-}
-
-function toggleBonus(i) {
-  const wrap = document.getElementById('bonus'+i+'-wrap');
-  wrap.classList.toggle('checked', document.getElementById('bonus'+i).checked);
-}
-
-// ── 追加 ──
-function addStock() {
-  const name = document.getElementById('f-name').value.trim();
-  const buy  = parseFloat(document.getElementById('f-buy').value);
-  if (!name) { showToast('銘柄名を入力してください', true); return; }
-  if (isNaN(buy) || buy <= 0) { showToast('購入価格を入力してください', true); return; }
-
-  const condChecks = [0,1,2,3,4].map(i => document.getElementById('cond'+i).checked);
-  const condNotes  = [0,1,2,3,4].map(i => document.getElementById('cond'+i+'-note').value.trim());
-  const bonusChecks = [0,1,2,3].map(i => document.getElementById('bonus'+i).checked);
-  const checkedCount = condChecks.filter(Boolean).length;
-  const judgment = checkedCount === 5 ? 'green' : checkedCount >= 3 ? 'yellow' : 'red';
-
-  stocks.push({
-    id: Date.now(),
-    code:    document.getElementById('f-code').value.trim(),
-    name,
-    buyDate: document.getElementById('f-date').value,
-    qty:     parseFloat(document.getElementById('f-qty').value) || null,
-    buy,
-    target:  parseFloat(document.getElementById('f-target').value) || null,
-    loss:    parseFloat(document.getElementById('f-loss').value) || null,
-    current: buy,
-    memo:    document.getElementById('f-memo').value.trim(),
-    condChecks, condNotes, bonusChecks,
-    checkedCount, judgment,
-    updatedAt: new Date().toLocaleString('ja-JP')
-  });
-
-  save();
+// リアルタイム同期
+onSnapshot(stocksCol, (snapshot) => {
+  stocks = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  stocks.sort((a, b) => (a.createdAt||0) - (b.createdAt||0));
   render();
-  resetForm();
-  showToast('✅ 追加しました');
+  setSyncStatus('ok');
+}, () => setSyncStatus('err'));
+
+async function saveStock(s) {
+  setSyncStatus('ing');
+  await setDoc(doc(db, 'stocks', String(s.id)), s);
+}
+async function removeStock(id) {
+  setSyncStatus('ing');
+  await deleteDoc(doc(db, 'stocks', String(id)));
 }
 
-function resetForm() {
-  ['f-code','f-name','f-qty','f-buy','f-target','f-loss','f-memo'].forEach(id => document.getElementById(id).value = '');
+// モーダル
+window.openAddModal = () => {
   document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
-  [0,1,2,3,4].forEach(i => {
-    document.getElementById('cond'+i).checked = false;
-    document.getElementById('cond'+i+'-note').value = '';
-    document.getElementById('cond'+i+'-wrap').classList.remove('checked');
-  });
-  [0,1,2,3].forEach(i => {
-    document.getElementById('bonus'+i).checked = false;
-    document.getElementById('bonus'+i+'-wrap').classList.remove('checked');
-  });
-  const badge = document.getElementById('judgment-badge');
-  badge.className = 'judgment none';
-  document.getElementById('judgment-emoji').textContent = '—';
-  document.getElementById('judgment-text').textContent = 'チェックを入れると判定が出ます';
-}
-
-function deleteStock(id) {
-  if (!confirm('削除しますか？')) return;
-  stocks = stocks.filter(s => s.id !== id);
-  save(); render(); showToast('🗑️ 削除しました');
-}
-
-// ── 現在値を手入力で更新 ──
-function promptPrice(id) {
-  const s = stocks.find(s => s.id === id);
-  const val = prompt(`${s.name}\n現在値を入力してください`, s.current);
-  if (val === null) return;
-  const price = parseFloat(val);
-  if (isNaN(price) || price <= 0) { showToast('正しい価格を入力してください', true); return; }
-  s.current = price;
-  s.updatedAt = new Date().toLocaleString('ja-JP');
-  save(); render(); showToast(`✅ ${s.name} を ¥${price.toLocaleString()} に更新`);
-}
-
-// ── 株価自動取得 ──
-const PROXIES = [
-  u => u,
-  u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-  u => `https://thingproxy.freeboard.io/fetch/${u}`,
-];
-
-async function fetchWithTimeout(url, ms = 8000) {
-  const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), ms);
-  try {
-    const res = await fetch(url, { signal: ctrl.signal });
-    clearTimeout(tid);
-    return res;
-  } catch(e) { clearTimeout(tid); throw e; }
-}
-
-async function fetchYahooPrice(code) {
-  if (!code) return null;
-  const sym = /^\d{4,5}$/.test(code) ? code + '.T' : code;
-  const cb = Date.now();
-  const endpoints = [
-    `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1d&_=${cb}`,
-    `https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1d&_=${cb}`,
-  ];
-  const attempts = [];
-  for (const ep of endpoints) {
-    for (const mkProxy of PROXIES) {
-      attempts.push(
-        fetchWithTimeout(mkProxy(ep))
-          .then(r => { if (!r.ok) throw 0; return r.json(); })
-          .then(data => {
-            const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-            const price = parsed?.chart?.result?.[0]?.meta?.regularMarketPrice;
-            if (price && price > 0) return price;
-            throw 0;
-          })
-      );
-    }
-  }
-  try { return await Promise.any(attempts); } catch(e) { return null; }
-}
-
-async function updateAllPrices() {
-  const targets = stocks.filter(s => s.code);
-  if (!targets.length) { showToast('銘柄コードが登録された銘柄がありません', true); return; }
-  showToast(`📡 ${targets.length}件の株価を取得中...`);
-
-  let ok = 0, fail = 0;
-  await Promise.all(targets.map(async s => {
-    const price = await fetchYahooPrice(s.code);
-    if (price) {
-      s.current = price;
-      s.updatedAt = new Date().toLocaleString('ja-JP');
-      ok++;
-    } else {
-      fail++;
-    }
-  }));
-
-  save(); render();
-  showToast(fail === 0
-    ? `✅ ${ok}件すべて取得成功`
-    : `✅ ${ok}件成功 / ❌ ${fail}件失敗`
-  , fail > 0 && ok === 0);
-  document.getElementById('lastUpdate').textContent =
-    new Date().toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
-}
-
-async function updateOnePrice(id) {
-  const s = stocks.find(s => s.id === id);
-  if (!s.code) { promptPrice(id); return; }
-  showToast(`📡 ${s.name} の株価を取得中...`);
-  const price = await fetchYahooPrice(s.code);
-  if (price) {
-    s.current = price;
-    s.updatedAt = new Date().toLocaleString('ja-JP');
-    save(); render();
-    showToast(`✅ ${s.name}: ¥${price.toLocaleString()}`);
-  } else {
-    showToast(`❌ 取得失敗。手動入力しますか？`, true);
-    setTimeout(() => promptPrice(id), 1000);
-  }
-}
-
-// ── 詳細モーダル ──
-const COND_LABELS = [
-  '① 上昇トレンド確認（75日線上向き・株価が75日線の上）',
-  '② 押し目が来ている（直近高値から5〜15%下落・25日線付近）',
-  '③ 反転サイン（陽線1〜3本＋出来高増加）',
-  '④ 過熱していない（RSI 70以下）',
-  '⑤ 相場環境が良い（VIX 20以下）',
-];
-const BONUS_LABELS = [
-  '直近決算が予想超え',
-  '明確な材料・テーマがある',
-  '出来高が20日平均の1.5倍以上',
-  '決算発表の2週間前後を避ける（確認済み）',
-];
-
-function showDetail(id) {
-  const s = stocks.find(s => s.id === id);
-  const diff = s.current - s.buy;
-  const rate = (diff / s.buy * 100).toFixed(2);
-  const rc = diff > 0 ? 'var(--red)' : diff < 0 ? 'var(--green)' : 'var(--muted)';
-  const jClass = s.judgment === 'green' ? 'green' : s.judgment === 'yellow' ? 'yellow' : 'red';
-  const jLabel = s.judgment === 'green' ? '🟢 買い' : s.judgment === 'yellow' ? '🟡 様子見' : '🔴 見送り';
-
-  const condHTML = (s.condChecks || []).map((ok, i) => `
-    <div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);align-items:flex-start;">
-      <span style="font-size:14px;flex-shrink:0">${ok ? '✅' : '⬜'}</span>
-      <div>
-        <div style="font-size:12px;color:${ok ? 'var(--text)' : 'var(--muted)'}">${COND_LABELS[i]}</div>
-        ${(s.condNotes || [])[i] ? `<div style="font-size:11px;color:var(--blue);margin-top:2px">${s.condNotes[i]}</div>` : ''}
-      </div>
-    </div>`).join('');
-
-  const bonusHTML = (s.bonusChecks || []).map((ok, i) => ok
-    ? `<div style="font-size:12px;color:var(--purple);padding:3px 0">✅ ${BONUS_LABELS[i]}</div>` : ''
-  ).join('');
-
-  document.getElementById('modal-title').textContent = `${s.name} ${s.code ? '('+s.code+')' : ''}`;
-  document.getElementById('modal-body').innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
-      <div style="background:var(--surface2);border-radius:8px;padding:10px">
-        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">購入価格</div>
-        <div style="font-size:16px;font-weight:700">¥${s.buy.toLocaleString()}</div>
-        ${s.buyDate ? `<div style="font-size:11px;color:var(--muted)">${s.buyDate}</div>` : ''}
-      </div>
-      <div style="background:var(--surface2);border-radius:8px;padding:10px">
-        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">現在値</div>
-        <div style="font-size:16px;font-weight:700;color:${rc}">¥${s.current.toLocaleString()}</div>
-        <div style="font-size:11px;color:${rc}">${diff >= 0 ? '+' : ''}${rate}%</div>
-      </div>
-      <div style="background:var(--surface2);border-radius:8px;padding:10px">
-        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">目標価格</div>
-        <div style="font-size:15px;font-weight:600;color:var(--blue)">${s.target ? '¥'+s.target.toLocaleString() : '—'}</div>
-      </div>
-      <div style="background:var(--surface2);border-radius:8px;padding:10px">
-        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">損切ライン</div>
-        <div style="font-size:15px;font-weight:600;color:var(--red)">${s.loss ? '¥'+s.loss.toLocaleString() : '—'}</div>
-      </div>
-    </div>
-
-    <div style="margin-bottom:12px">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">判定</div>
-      <span style="padding:4px 14px;border-radius:20px;font-weight:700;font-size:14px;background:${jClass==='green'?'rgba(74,222,154,.15)':jClass==='yellow'?'rgba(250,204,21,.15)':'rgba(248,113,113,.15)'};color:${jClass==='green'?'var(--green)':jClass==='yellow'?'var(--yellow)':'var(--red)'}">${jLabel}（${s.checkedCount}/5）</span>
-    </div>
-
-    <div style="margin-bottom:12px">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">押し目買い5条件</div>
-      ${condHTML}
-    </div>
-
-    ${bonusHTML ? `<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">加点条件</div>${bonusHTML}</div>` : ''}
-
-    ${s.memo ? `<div style="font-size:12px;color:var(--muted);border-top:1px solid var(--border);padding-top:10px">📝 ${s.memo}</div>` : ''}
-  `;
-  document.getElementById('detailModal').classList.add('open');
-}
-
-function closeModal() { document.getElementById('detailModal').classList.remove('open'); }
-document.getElementById('detailModal').addEventListener('click', e => {
-  if (e.target === document.getElementById('detailModal')) closeModal();
+  document.getElementById('addModal').classList.add('open');
+  setTimeout(() => document.getElementById('f-name').focus(), 80);
+};
+window.closeAddModal = () => document.getElementById('addModal').classList.remove('open');
+document.getElementById('addModal').addEventListener('click', e => {
+  if(e.target===document.getElementById('addModal')) window.closeAddModal();
 });
 
-// ── レンダリング ──
+window.autoFill = (val) => {
+  const p = parseFloat(val); if(!p||p<=0) return;
+  document.getElementById('f-target').value = Math.round(p*1.10);
+  document.getElementById('f-loss').value   = Math.round(p*0.95);
+};
+
+window.updateJudgment = () => {
+  const count = [0,1,2,3,4].filter(i=>document.getElementById('cond'+i).checked).length;
+  const badge=document.getElementById('judgment-badge');
+  const emoji=document.getElementById('judgment-emoji');
+  const text=document.getElementById('judgment-text');
+  badge.className='judgment';
+  if(count===5)     { badge.classList.add('green');  emoji.textContent='🟢'; text.textContent=`買い（${count}/5条件クリア）`; }
+  else if(count>=3) { badge.classList.add('yellow'); emoji.textContent='🟡'; text.textContent=`様子見（${count}/5条件クリア）`; }
+  else if(count>0)  { badge.classList.add('red');    emoji.textContent='🔴'; text.textContent=`見送り（${count}/5条件クリア）`; }
+  else              { badge.classList.add('none');   emoji.textContent='—';  text.textContent='チェックを入れると判定が出ます'; }
+  [0,1,2,3,4].forEach(i=>document.getElementById('cond'+i+'-wrap').classList.toggle('checked',document.getElementById('cond'+i).checked));
+};
+
+window.toggleBonus = (i) => document.getElementById('bonus'+i+'-wrap').classList.toggle('checked',document.getElementById('bonus'+i).checked);
+
+window.addStock = async () => {
+  const name=document.getElementById('f-name').value.trim();
+  const buy=parseFloat(document.getElementById('f-buy').value);
+  if(!name){ showToast('銘柄名を入力してください',true); return; }
+  if(isNaN(buy)||buy<=0){ showToast('購入価格を入力してください',true); return; }
+  const condChecks=[0,1,2,3,4].map(i=>document.getElementById('cond'+i).checked);
+  const condNotes=[0,1,2,3,4].map(i=>document.getElementById('cond'+i+'-note').value.trim());
+  const bonusChecks=[0,1,2,3].map(i=>document.getElementById('bonus'+i).checked);
+  const checkedCount=condChecks.filter(Boolean).length;
+  const s={
+    id: Date.now(), createdAt: Date.now(),
+    code: document.getElementById('f-code').value.trim(), name,
+    buyDate: document.getElementById('f-date').value,
+    qty: parseFloat(document.getElementById('f-qty').value)||null,
+    buy, target: parseFloat(document.getElementById('f-target').value)||null,
+    loss: parseFloat(document.getElementById('f-loss').value)||null,
+    current: buy, memo: document.getElementById('f-memo').value.trim(),
+    condChecks, condNotes, bonusChecks, checkedCount,
+    judgment: checkedCount===5?'green':checkedCount>=3?'yellow':'red',
+    updatedAt: new Date().toLocaleString('ja-JP')
+  };
+  await saveStock(s);
+  resetForm(); window.closeAddModal();
+  showToast('✅ 追加しました（クラウドに保存）');
+};
+
+function resetForm() {
+  ['f-code','f-name','f-qty','f-buy','f-target','f-loss','f-memo'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
+  [0,1,2,3,4].forEach(i=>{ document.getElementById('cond'+i).checked=false; document.getElementById('cond'+i+'-note').value=''; document.getElementById('cond'+i+'-wrap').classList.remove('checked'); });
+  [0,1,2,3].forEach(i=>{ document.getElementById('bonus'+i).checked=false; document.getElementById('bonus'+i+'-wrap').classList.remove('checked'); });
+  document.getElementById('judgment-badge').className='judgment none';
+  document.getElementById('judgment-emoji').textContent='—';
+  document.getElementById('judgment-text').textContent='チェックを入れると判定が出ます';
+}
+
+window.deleteStock = async (id) => {
+  if(!confirm('削除しますか？')) return;
+  await removeStock(id);
+  showToast('🗑️ 削除しました');
+};
+
+window.promptPrice = async (id) => {
+  const s=stocks.find(s=>String(s.id)===String(id));
+  const val=prompt(`${s.name}\n現在値を入力してください`,s.current);
+  if(val===null) return;
+  const price=parseFloat(val);
+  if(isNaN(price)||price<=0){ showToast('正しい価格を入力してください',true); return; }
+  s.current=price; s.updatedAt=new Date().toLocaleString('ja-JP');
+  await saveStock(s);
+  showToast(`✅ ${s.name} を ¥${price.toLocaleString()} に更新`);
+};
+
+const PROXIES=[u=>u, u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`, u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`, u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`, u=>`https://thingproxy.freeboard.io/fetch/${u}`];
+
+async function fetchWithTimeout(url,ms=8000){
+  const ctrl=new AbortController(); const tid=setTimeout(()=>ctrl.abort(),ms);
+  try{ const res=await fetch(url,{signal:ctrl.signal}); clearTimeout(tid); return res; }
+  catch(e){ clearTimeout(tid); throw e; }
+}
+
+async function fetchYahooPrice(code){
+  if(!code) return null;
+  const sym=/^\d{4,5}$/.test(code)?code+'.T':code;
+  const cb=Date.now();
+  const endpoints=[`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1d&_=${cb}`,`https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1d&_=${cb}`];
+  const attempts=[];
+  for(const ep of endpoints) for(const mkProxy of PROXIES)
+    attempts.push(fetchWithTimeout(mkProxy(ep)).then(r=>{if(!r.ok)throw 0;return r.json();}).then(data=>{const parsed=typeof data==='string'?JSON.parse(data):data;const price=parsed?.chart?.result?.[0]?.meta?.regularMarketPrice;if(price&&price>0)return price;throw 0;}));
+  try{ return await Promise.any(attempts); }catch(e){ return null; }
+}
+
+window.updateAllPrices = async () => {
+  const targets=stocks.filter(s=>s.code);
+  if(!targets.length){ showToast('銘柄コードが登録された銘柄がありません',true); return; }
+  showToast(`📡 ${targets.length}件の株価を取得中...`);
+  let ok=0,fail=0;
+  await Promise.all(targets.map(async s=>{
+    const price=await fetchYahooPrice(s.code);
+    if(price){ s.current=price; s.updatedAt=new Date().toLocaleString('ja-JP'); await saveStock(s); ok++; } else fail++;
+  }));
+  showToast(fail===0?`✅ ${ok}件すべて取得成功`:`✅ ${ok}件成功 / ❌ ${fail}件失敗`,fail>0&&ok===0);
+};
+
+window.updateOnePrice = async (id) => {
+  const s=stocks.find(s=>String(s.id)===String(id));
+  if(!s.code){ window.promptPrice(id); return; }
+  showToast(`📡 ${s.name} の株価を取得中...`);
+  const price=await fetchYahooPrice(s.code);
+  if(price){ s.current=price; s.updatedAt=new Date().toLocaleString('ja-JP'); await saveStock(s); showToast(`✅ ${s.name}: ¥${price.toLocaleString()}`); }
+  else{ showToast(`❌ 取得失敗。手動入力します`,true); setTimeout(()=>window.promptPrice(id),1000); }
+};
+
+const COND_LABELS=['① 上昇トレンド確認（75日線上向き・株価が75日線の上）','② 押し目が来ている（直近高値から5〜15%下落・25日線付近）','③ 反転サイン（陽線1〜3本＋出来高増加）','④ 過熱していない（RSI 70以下）','⑤ 相場環境が良い（VIX 20以下）'];
+const BONUS_LABELS=['直近決算が予想超え','明確な材料・テーマがある','出来高が20日平均の1.5倍以上','決算発表の2週間前後を避ける（確認済み）'];
+
+window.showDetail = (id) => {
+  const s=stocks.find(s=>String(s.id)===String(id));
+  const diff=s.current-s.buy; const rate=(diff/s.buy*100).toFixed(2);
+  const rc=diff>0?'var(--red)':diff<0?'var(--green)':'var(--muted)';
+  const jClass=s.judgment==='green'?'green':s.judgment==='yellow'?'yellow':'red';
+  const jLabel=s.judgment==='green'?'🟢 買い':s.judgment==='yellow'?'🟡 様子見':'🔴 見送り';
+  const condHTML=(s.condChecks||[]).map((ok,i)=>`<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);align-items:flex-start;"><span style="font-size:14px;flex-shrink:0">${ok?'✅':'⬜'}</span><div><div style="font-size:12px;color:${ok?'var(--text)':'var(--muted)'}">${COND_LABELS[i]}</div>${(s.condNotes||[])[i]?`<div style="font-size:11px;color:var(--blue);margin-top:2px">${s.condNotes[i]}</div>`:''}</div></div>`).join('');
+  const bonusHTML=(s.bonusChecks||[]).map((ok,i)=>ok?`<div style="font-size:12px;color:var(--purple);padding:3px 0">✅ ${BONUS_LABELS[i]}</div>`:'').join('');
+  document.getElementById('modal-title').textContent=`${s.name} ${s.code?'('+s.code+')':''}`;
+  document.getElementById('modal-body').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+      <div style="background:var(--surface2);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">購入価格</div><div style="font-size:16px;font-weight:700">¥${s.buy.toLocaleString()}</div>${s.buyDate?`<div style="font-size:11px;color:var(--muted)">${s.buyDate}</div>`:''}</div>
+      <div style="background:var(--surface2);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">現在値</div><div style="font-size:16px;font-weight:700;color:${rc}">¥${s.current.toLocaleString()}</div><div style="font-size:11px;color:${rc}">${diff>=0?'+':''}${rate}%</div></div>
+      <div style="background:var(--surface2);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">目標価格</div><div style="font-size:15px;font-weight:600;color:var(--blue)">${s.target?'¥'+s.target.toLocaleString():'—'}</div></div>
+      <div style="background:var(--surface2);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">損切ライン</div><div style="font-size:15px;font-weight:600;color:var(--red)">${s.loss?'¥'+s.loss.toLocaleString():'—'}</div></div>
+    </div>
+    <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">判定</div><span style="padding:4px 14px;border-radius:20px;font-weight:700;font-size:14px;background:${jClass==='green'?'rgba(74,222,154,.15)':jClass==='yellow'?'rgba(250,204,21,.15)':'rgba(248,113,113,.15)'};color:${jClass==='green'?'var(--green)':jClass==='yellow'?'var(--yellow)':'var(--red)'}">${jLabel}（${s.checkedCount}/5）</span></div>
+    <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">押し目買い5条件</div>${condHTML}</div>
+    ${bonusHTML?`<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">加点条件</div>${bonusHTML}</div>`:''}
+    ${s.memo?`<div style="font-size:12px;color:var(--muted);border-top:1px solid var(--border);padding-top:10px">📝 ${s.memo}</div>`:''}
+  `;
+  document.getElementById('detailModal').classList.add('open');
+};
+
+window.closeModal = () => document.getElementById('detailModal').classList.remove('open');
+document.getElementById('detailModal').addEventListener('click', e=>{
+  if(e.target===document.getElementById('detailModal')) window.closeModal();
+});
+
 function render() {
-  const el = document.getElementById('watchlist');
-  if (!stocks.length) {
-    el.innerHTML = `<div class="empty"><div class="icon">📋</div>上のフォームから銘柄を追加してください</div>`;
-    return;
-  }
-
-  el.innerHTML = stocks.map(s => {
-    const diff = s.current - s.buy;
-    const rate = (diff / s.buy * 100).toFixed(2);
-    const rc = diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat';
-    const sign = diff > 0 ? '+' : '';
-    const jClass = s.judgment || 'none';
-    const jLabel = jClass === 'green' ? '🟢 買い' : jClass === 'yellow' ? '🟡 様子見' : jClass === 'red' ? '🔴 見送り' : '— 未判定';
-
-    const condDots = (s.condChecks || []).map(ok =>
-      `<span class="cond-dot ${ok ? 'on' : 'off'}" title="${ok ? 'OK' : 'NG'}"></span>`
-    ).join('');
-
-    return `
-    <div class="stock-card">
-      <div class="sc-top">
-        <div>
-          <div class="sc-name">${s.name}</div>
-          <div class="sc-code">${s.code || '—'}${s.buyDate ? ' · ' + s.buyDate : ''}</div>
-        </div>
-        <div class="sc-price-block">
-          <div class="sc-current ${rc}">¥${s.current.toLocaleString()}</div>
-          <div class="sc-rate ${rc}">${sign}${rate}%</div>
-        </div>
-      </div>
-
+  const el=document.getElementById('watchlist');
+  if(!stocks.length){ el.innerHTML=`<div class="empty"><div class="icon">📋</div>右下の＋から銘柄を追加してください</div>`; return; }
+  el.innerHTML=stocks.map(s=>{
+    const diff=s.current-s.buy; const rate=(diff/s.buy*100).toFixed(2);
+    const rc=diff>0?'up':diff<0?'down':'flat'; const sign=diff>0?'+':'';
+    const jClass=s.judgment||'none';
+    const jLabel=jClass==='green'?'🟢 買い':jClass==='yellow'?'🟡 様子見':jClass==='red'?'🔴 見送り':'— 未判定';
+    const condDots=(s.condChecks||[]).map(ok=>`<span class="cond-dot ${ok?'on':'off'}"></span>`).join('');
+    return `<div class="stock-card">
+      <div class="sc-top"><div><div class="sc-name">${s.name}</div><div class="sc-code">${s.code||'—'}${s.buyDate?' · '+s.buyDate:''}</div></div>
+      <div class="sc-price-block"><div class="sc-current ${rc}">¥${s.current.toLocaleString()}</div><div class="sc-rate ${rc}">${sign}${rate}%</div></div></div>
       <div class="sc-bars">
         <div class="sc-bar"><div class="sc-bar-label">購入価格</div><div class="sc-bar-val col-buy">¥${s.buy.toLocaleString()}</div></div>
-        <div class="sc-bar"><div class="sc-bar-label">目標価格</div><div class="sc-bar-val col-target">${s.target ? '¥'+s.target.toLocaleString() : '—'}</div></div>
-        <div class="sc-bar"><div class="sc-bar-label">損切ライン</div><div class="sc-bar-val col-loss">${s.loss ? '¥'+s.loss.toLocaleString() : '—'}</div></div>
+        <div class="sc-bar"><div class="sc-bar-label">目標価格</div><div class="sc-bar-val col-target">${s.target?'¥'+s.target.toLocaleString():'—'}</div></div>
+        <div class="sc-bar"><div class="sc-bar-label">損切ライン</div><div class="sc-bar-val col-loss">${s.loss?'¥'+s.loss.toLocaleString():'—'}</div></div>
       </div>
-
       <span class="sc-judge ${jClass}">${jLabel}</span>
       <div class="sc-cond-mini">${condDots}</div>
-
-      <div class="sc-footer">
-        <div class="sc-memo">${s.memo || ''}</div>
-        <div class="sc-btns">
-          <button class="btn btn-sm btn-ghost" onclick="showDetail(${s.id})">詳細</button>
-          <button class="btn btn-sm btn-price" onclick="updateOnePrice(${s.id})">値更新</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteStock(${s.id})">削除</button>
-        </div>
-      </div>
+      <div class="sc-footer"><div class="sc-memo">${s.memo||''}</div>
+      <div class="sc-btns">
+        <button class="btn btn-sm btn-ghost" onclick="showDetail('${s.id}')">詳細</button>
+        <button class="btn btn-sm btn-price" onclick="updateOnePrice('${s.id}')">値更新</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteStock('${s.id}')">削除</button>
+      </div></div>
     </div>`;
   }).join('');
-
-  document.getElementById('lastUpdate').textContent =
-    new Date().toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  document.getElementById('lastUpdate').textContent=new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 }
 
-// ── トースト ──
 let toastTimer;
-function showToast(msg, isErr = false) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show' + (isErr ? ' err' : '');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+function showToast(msg,isErr=false){
+  const t=document.getElementById('toast'); t.textContent=msg;
+  t.className='toast show'+(isErr?' err':'');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),3000);
 }
+window.showToast=showToast;
 
-render();
 </script>
 </body>
 </html>
