@@ -101,6 +101,19 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 .col-target{color:var(--blue);}
 .col-loss{color:var(--red);}
 
+/* ── ゲージバー ── */
+.gauge-wrap{margin-bottom:10px;}
+.gauge-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:4px;}
+.gauge-track{height:8px;background:var(--surface2);border-radius:4px;position:relative;overflow:visible;}
+.gauge-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--red),var(--green));position:absolute;left:0;}
+.gauge-marker{position:absolute;top:-4px;width:3px;height:16px;border-radius:2px;background:white;transform:translateX(-50%);}
+.gauge-remain{display:flex;justify-content:space-between;margin-top:5px;}
+.gauge-remain span{font-size:11px;font-weight:600;}
+.alert-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;margin-bottom:8px;animation:pulse 1s infinite;}
+.alert-win{background:rgba(74,222,154,.2);color:var(--green);border:1px solid var(--green);}
+.alert-lose{background:rgba(248,113,113,.2);color:var(--red);border:1px solid var(--red);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+
 .sc-judge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:8px;}
 .sc-judge.green{background:rgba(74,222,154,.15);color:var(--green);}
 .sc-judge.yellow{background:rgba(250,204,21,.15);color:var(--yellow);}
@@ -144,6 +157,8 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
   <h1>📈 トレードログ</h1>
   <div class="header-right">
     <span class="sync-status sync-ing" id="syncStatus">⏳ 接続中...</span>
+    <button class="btn btn-sm btn-ghost" onclick="document.getElementById('importFile').click()" style="font-size:11px;padding:4px 10px;">📥 インポート</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importFromFile(this)">
     <span id="lastUpdate"></span>
   </div>
 </header>
@@ -258,6 +273,29 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
     <div class="modal-footer">
       <button class="btn btn-sm btn-ghost" onclick="closeAddModal()">キャンセル</button>
       <button class="btn btn-primary" style="width:auto;padding:10px 24px;" onclick="addStock()">追加する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 決済モーダル -->
+<div class="modal" id="settleModal">
+  <div class="modal-inner">
+    <div class="modal-title">💰 決済記録</div>
+    <div id="settle-stock-info" style="background:var(--surface2);border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;"></div>
+    <div class="row row2">
+      <div class="fg"><label>決済日</label><input id="s-date" type="date"></div>
+      <div class="fg"><label>決済価格 (円) *</label><input id="s-price" type="number" placeholder="例: 3800" oninput="calcSettlePL()"></div>
+    </div>
+    <div id="s-pl-preview" style="display:none;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:600;font-size:15px;"></div>
+    <div class="row row1">
+      <div class="fg"><label>売った理由</label><input id="s-reason" placeholder="例: 目標価格到達、損切りライン割れ"></div>
+    </div>
+    <div class="row row1">
+      <div class="fg"><label>振り返りメモ（任意）</label><textarea id="s-memo" placeholder="反省点・良かった点など"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sm btn-ghost" onclick="closeSettleModal()">キャンセル</button>
+      <button class="btn btn-primary" style="width:auto;padding:10px 24px;" onclick="submitSettle()">決済を記録する</button>
     </div>
   </div>
 </div>
@@ -477,31 +515,171 @@ document.getElementById('detailModal').addEventListener('click', e=>{
   if(e.target===document.getElementById('detailModal')) window.closeModal();
 });
 
+let settlingId = null;
+
+window.openSettleModal = (id) => {
+  settlingId = id;
+  const s = stocks.find(s => String(s.id) === String(id));
+  document.getElementById('s-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('s-price').value = '';
+  document.getElementById('s-reason').value = '';
+  document.getElementById('s-memo').value = '';
+  document.getElementById('s-pl-preview').style.display = 'none';
+  const diff = s.current - s.buy;
+  const rate = (diff / s.buy * 100).toFixed(2);
+  const rc = diff >= 0 ? 'var(--red)' : 'var(--green)';
+  document.getElementById('settle-stock-info').innerHTML = `
+    <div style="font-size:15px;font-weight:700;margin-bottom:6px">${s.name}${s.code ? ' (' + s.code + ')' : ''}</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      <span>購入価格: <b>¥${s.buy.toLocaleString()}</b></span>
+      <span>現在値: <b style="color:${rc}">¥${s.current.toLocaleString()} (${diff >= 0 ? '+' : ''}${rate}%)</b></span>
+      ${s.qty ? `<span>株数: <b>${s.qty}株</b></span>` : ''}
+    </div>`;
+  document.getElementById('settleModal').classList.add('open');
+};
+window.closeSettleModal = () => {
+  document.getElementById('settleModal').classList.remove('open');
+  settlingId = null;
+};
+document.getElementById('settleModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('settleModal')) window.closeSettleModal();
+});
+
+window.calcSettlePL = () => {
+  const s = stocks.find(s => String(s.id) === String(settlingId));
+  const sellPrice = parseFloat(document.getElementById('s-price').value);
+  const preview = document.getElementById('s-pl-preview');
+  if (!s || isNaN(sellPrice) || sellPrice <= 0) { preview.style.display = 'none'; return; }
+  const plPct = ((sellPrice - s.buy) / s.buy * 100).toFixed(2);
+  const plYen = s.qty ? Math.round((sellPrice - s.buy) * s.qty) : null;
+  const isWin = sellPrice >= s.buy;
+  preview.style.cssText = `display:block;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:600;font-size:15px;background:${isWin ? 'rgba(74,222,154,.1)' : 'rgba(248,113,113,.1)'};border:1px solid ${isWin ? 'rgba(74,222,154,.3)' : 'rgba(248,113,113,.3)'};color:${isWin ? 'var(--green)' : 'var(--red)'};`;
+  preview.textContent = `${isWin ? '📈 利益' : '📉 損失'}: ${isWin ? '+' : ''}${plPct}%${plYen !== null ? ' (' + (isWin ? '+' : '') + '¥' + plYen.toLocaleString() + ')' : ''}`;
+};
+
+window.submitSettle = async () => {
+  const s = stocks.find(s => String(s.id) === String(settlingId));
+  if (!s) return;
+  const sellPrice = parseFloat(document.getElementById('s-price').value);
+  if (isNaN(sellPrice) || sellPrice <= 0) { showToast('決済価格を入力してください', true); return; }
+  const plPct = ((sellPrice - s.buy) / s.buy * 100).toFixed(2);
+  const plYen = s.qty ? Math.round((sellPrice - s.buy) * s.qty) : null;
+  const historyItem = {
+    ...s,
+    sellDate: document.getElementById('s-date').value,
+    sellPrice,
+    sellReason: document.getElementById('s-reason').value.trim(),
+    sellMemo: document.getElementById('s-memo').value.trim(),
+    plPct: parseFloat(plPct),
+    plYen,
+    settledAt: Date.now()
+  };
+  await setDoc(doc(db, 'history', String(s.id)), historyItem);
+  await removeStock(s.id);
+  window.closeSettleModal();
+  showToast(`✅ 決済完了！ ${parseFloat(plPct) >= 0 ? '+' : ''}${plPct}%`);
+};
+
+window.importFromFile = async function(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      const items = Array.isArray(data) ? data : data.stocks;
+      if (!items || !items.length) { showToast('データが見つかりませんでした', true); return; }
+      let added = 0;
+      for (const item of items) {
+        if (stocks.find(s => s.code === item.code && s.name === item.name)) continue;
+        const newStock = { ...item, id: String(Date.now() + Math.random()), createdAt: Date.now() };
+        await saveStock(newStock);
+        added++;
+      }
+      showToast(`✅ ${added}件インポートしました`);
+    } catch(err) { showToast('ファイルの読み込みに失敗しました', true); }
+    input.value = '';
+  };
+  reader.readAsText(file);
+};
+
+function chartUrl(code) {
+  if (!code) return null;
+  if (/^\d{4,5}$/.test(code)) return `https://finance.yahoo.co.jp/quote/${code}.T`;
+  return `https://finance.yahoo.com/quote/${code}`;
+}
+
 function render() {
   const el=document.getElementById('watchlist');
   if(!stocks.length){ el.innerHTML=`<div class="empty"><div class="icon">📋</div>右下の＋から銘柄を追加してください</div>`; return; }
   el.innerHTML=stocks.map(s=>{
-    const diff=s.current-s.buy; const rate=(diff/s.buy*100).toFixed(2);
-    const rc=diff>0?'up':diff<0?'down':'flat'; const sign=diff>0?'+':'';
+    const diff=s.current-s.buy;
+    const rate=(diff/s.buy*100).toFixed(2);
+    const rc=diff>0?'up':diff<0?'down':'flat';
+    const sign=diff>0?'+':'';
     const jClass=s.judgment||'none';
     const jLabel=jClass==='green'?'🟢 買い':jClass==='yellow'?'🟡 様子見':jClass==='red'?'🔴 見送り':'— 未判定';
     const condDots=(s.condChecks||[]).map(ok=>`<span class="cond-dot ${ok?'on':'off'}"></span>`).join('');
+    const url=chartUrl(s.code);
+
+    // ゲージバー計算
+    let gaugeHTML='';
+    if(s.loss && s.target){
+      const lo=s.loss, hi=s.target, cur=s.current;
+      const range=hi-lo;
+      const fillPct=Math.min(Math.max((cur-lo)/range*100,0),100);
+      const markerPct=Math.min(Math.max((cur-lo)/range*100,0),100);
+      const toTarget=((hi-cur)/cur*100).toFixed(1);
+      const toLoss=((cur-lo)/cur*100).toFixed(1);
+      const hitTarget=cur>=hi;
+      const hitLoss=cur<=lo;
+      const alertHTML=hitTarget
+        ?`<div class="alert-badge alert-win">🔔 目標価格到達！</div>`
+        :hitLoss?`<div class="alert-badge alert-lose">🚨 損切ライン注意！</div>`:'';
+      gaugeHTML=`
+        ${alertHTML}
+        <div class="gauge-wrap">
+          <div class="gauge-labels"><span style="color:var(--red)">損切 ¥${lo.toLocaleString()}</span><span style="color:var(--blue)">目標 ¥${hi.toLocaleString()}</span></div>
+          <div class="gauge-track">
+            <div class="gauge-fill" style="width:${fillPct}%"></div>
+            <div class="gauge-marker" style="left:${markerPct}%"></div>
+          </div>
+          <div class="gauge-remain">
+            <span style="color:var(--red)">損切まで -${toLoss}%</span>
+            <span style="color:var(--blue)">目標まで +${toTarget}%</span>
+          </div>
+        </div>`;
+    }
+
     return `<div class="stock-card">
-      <div class="sc-top"><div><div class="sc-name">${s.name}</div><div class="sc-code">${s.code||'—'}${s.buyDate?' · '+s.buyDate:''}</div></div>
-      <div class="sc-price-block"><div class="sc-current ${rc}">¥${s.current.toLocaleString()}</div><div class="sc-rate ${rc}">${sign}${rate}%</div></div></div>
+      <div class="sc-top">
+        <div>
+          <div class="sc-name">${s.name}</div>
+          <div class="sc-code">${s.code||'—'}${s.buyDate?' · '+s.buyDate:''}</div>
+        </div>
+        <div class="sc-price-block">
+          <div class="sc-current ${rc}">¥${s.current.toLocaleString()}</div>
+          <div class="sc-rate ${rc}">${sign}${rate}%</div>
+        </div>
+      </div>
       <div class="sc-bars">
         <div class="sc-bar"><div class="sc-bar-label">購入価格</div><div class="sc-bar-val col-buy">¥${s.buy.toLocaleString()}</div></div>
         <div class="sc-bar"><div class="sc-bar-label">目標価格</div><div class="sc-bar-val col-target">${s.target?'¥'+s.target.toLocaleString():'—'}</div></div>
         <div class="sc-bar"><div class="sc-bar-label">損切ライン</div><div class="sc-bar-val col-loss">${s.loss?'¥'+s.loss.toLocaleString():'—'}</div></div>
       </div>
+      ${gaugeHTML}
       <span class="sc-judge ${jClass}">${jLabel}</span>
       <div class="sc-cond-mini">${condDots}</div>
-      <div class="sc-footer"><div class="sc-memo">${s.memo||''}</div>
-      <div class="sc-btns">
-        <button class="btn btn-sm btn-ghost" onclick="showDetail('${s.id}')">詳細</button>
-        <button class="btn btn-sm btn-price" onclick="updateOnePrice('${s.id}')">値更新</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteStock('${s.id}')">削除</button>
-      </div></div>
+      <div class="sc-footer">
+        <div class="sc-memo">${s.memo||''}</div>
+        <div class="sc-btns">
+          ${url?`<a href="${url}" target="_blank" rel="noopener" class="btn btn-sm btn-ghost" style="text-decoration:none">📈</a>`:''}
+          <button class="btn btn-sm btn-ghost" onclick="showDetail('${s.id}')">詳細</button>
+          <button class="btn btn-sm btn-price" onclick="updateOnePrice('${s.id}')">値更新</button>
+          <button class="btn btn-sm" style="background:rgba(250,204,21,.15);color:var(--yellow);border:1px solid rgba(250,204,21,.3);padding:5px 11px;font-size:12px;font-weight:500;border-radius:8px;cursor:pointer;" onclick="openSettleModal('${s.id}')">決済</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteStock('${s.id}')">削除</button>
+        </div>
+      </div>
     </div>`;
   }).join('');
   document.getElementById('lastUpdate').textContent=new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
