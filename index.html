@@ -179,6 +179,8 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
   <h1>📈 トレードログ</h1>
   <div class="header-right">
     <span class="sync-status sync-ing" id="syncStatus">⏳ 接続中...</span>
+    <span id="userInfo" style="font-size:10px;color:var(--muted);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle"></span>
+    <button onclick="googleSignOut()" style="font-size:10px;padding:3px 8px;border-radius:6px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer" title="ログアウト">🚪</button>
     <a href="dashboard.html" class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 10px;text-decoration:none">📊 ダッシュボード</a>
     <button class="btn btn-sm btn-ghost" onclick="document.getElementById('importFile').click()" style="font-size:11px;padding:4px 10px;">📥 インポート</button>
     <input type="file" id="importFile" accept=".json" style="display:none" onchange="importFromFile(this)">
@@ -387,11 +389,22 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
   </div>
 </div>
 
+<!-- ログインオーバーレイ -->
+<div id="loginOverlay" style="display:flex;position:fixed;inset:0;z-index:9999;background:rgba(13,15,20,.97);flex-direction:column;align-items:center;justify-content:center;gap:20px;">
+  <div style="font-size:3rem">📈</div>
+  <div style="font-size:1.3rem;font-weight:700;color:#4ade9a">トレードログ</div>
+  <div style="color:#6b7185;font-size:13px;text-align:center;max-width:260px;line-height:1.6">Googleアカウントでログインして<br>データを同期してください</div>
+  <button onclick="googleSignIn()" style="background:#4ade9a;color:#0d0f14;border:none;border-radius:8px;padding:12px 28px;font-size:15px;font-weight:700;cursor:pointer">
+    🔑 Googleでログイン
+  </button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA1DGiJ6TShj6ZI5_j-vkR5gSKsxEfUwqA",
@@ -403,33 +416,60 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
+const db   = getFirestore(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
 const stocksCol  = collection(db, 'watchlist');
 const historyCol = collection(db, 'history');
 
 let stocks  = [];
 let history = [];
+let _unsubStocks  = null;
+let _unsubHistory = null;
 
 function setSyncStatus(state) {
   const el = document.getElementById('syncStatus');
-  if(state==='ok')  { el.textContent='☁️ 同期済み';  el.className='sync-status sync-ok'; }
-  if(state==='ing') { el.textContent='⏳ 同期中...'; el.className='sync-status sync-ing'; }
-  if(state==='err') { el.textContent='❌ オフライン'; el.className='sync-status sync-err'; }
+  if(state==='ok')    { el.textContent='☁️ 同期済み';  el.className='sync-status sync-ok'; }
+  if(state==='ing')   { el.textContent='⏳ 同期中...'; el.className='sync-status sync-ing'; }
+  if(state==='err')   { el.textContent='❌ オフライン'; el.className='sync-status sync-err'; }
+  if(state==='login') { el.textContent='🔒 未ログイン'; el.className='sync-status sync-err'; }
 }
 
-// リアルタイム同期
-onSnapshot(stocksCol, (snapshot) => {
-  stocks = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-  stocks.sort((a, b) => (a.createdAt||0) - (b.createdAt||0));
-  render();
-  setSyncStatus('ok');
-}, () => setSyncStatus('err'));
+// Google認証
+window.googleSignIn  = () => signInWithPopup(auth, provider).catch(e => console.error('login error', e));
+window.googleSignOut = () => signOut(auth);
 
-onSnapshot(historyCol, (snapshot) => {
-  history = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-  history.sort((a, b) => (b.settledAt||0) - (a.settledAt||0));
-  renderHistory();
-  renderStats();
+// 認証状態を監視してからFirestoreを開始
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    document.getElementById('loginOverlay').style.display = 'none';
+    const ui = document.getElementById('userInfo');
+    if(ui) ui.textContent = user.displayName || user.email || '';
+    // リアルタイム同期開始
+    if (!_unsubStocks) {
+      _unsubStocks = onSnapshot(stocksCol, (snapshot) => {
+        stocks = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        stocks.sort((a, b) => (a.createdAt||0) - (b.createdAt||0));
+        render();
+        setSyncStatus('ok');
+      }, () => setSyncStatus('err'));
+    }
+    if (!_unsubHistory) {
+      _unsubHistory = onSnapshot(historyCol, (snapshot) => {
+        history = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        history.sort((a, b) => (b.settledAt||0) - (a.settledAt||0));
+        renderHistory();
+        renderStats();
+      });
+    }
+  } else {
+    document.getElementById('loginOverlay').style.display = 'flex';
+    setSyncStatus('login');
+    if (_unsubStocks)  { _unsubStocks();  _unsubStocks  = null; }
+    if (_unsubHistory) { _unsubHistory(); _unsubHistory = null; }
+    stocks = []; history = [];
+    render(); renderHistory(); renderStats();
+  }
 });
 
 let activeTab = 'watch';

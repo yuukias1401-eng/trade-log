@@ -251,6 +251,9 @@ tr.h-short td:first-child { border-left:3px solid #f87171; }
     <div class="header-sub" id="lastUpdated">最終更新: —</div>
   </div>
   <div class="header-actions">
+    <span id="dashUserInfo" style="font-size:10px;color:var(--text-muted);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle"></span>
+    <button onclick="googleSignOut()" class="btn btn-ghost" style="font-size:11px;padding:4px 8px" title="ログアウト">🚪 ログアウト</button>
+    <a href="index.html" class="btn btn-ghost" style="font-size:11px;padding:4px 10px;text-decoration:none">📈 トレードログ</a>
     <button class="btn btn-ghost" onclick="exportCSV()">📄 CSV出力</button>
     <button class="btn btn-ghost" onclick="exportJSON()">💾 バックアップ</button>
     <button class="btn btn-ghost" onclick="restoreJSON()">📂 復元</button>
@@ -718,10 +721,21 @@ tr.h-short td:first-child { border-left:3px solid #f87171; }
   </div>
 </div>
 
+<!-- ログインオーバーレイ -->
+<div id="loginOverlay" style="display:flex;position:fixed;inset:0;z-index:9999;background:rgba(13,15,20,.97);flex-direction:column;align-items:center;justify-content:center;gap:20px;">
+  <div style="font-size:3rem">📊</div>
+  <div style="font-size:1.3rem;font-weight:700;color:#4ade9a">資産ダッシュボード</div>
+  <div style="color:#6b7185;font-size:13px;text-align:center;max-width:280px;line-height:1.6">Googleアカウントでログインして<br>トレードログとデータを同期してください</div>
+  <button onclick="googleSignIn()" style="background:#4ade9a;color:#0d0f14;border:none;border-radius:8px;padding:12px 28px;font-size:15px;font-weight:700;cursor:pointer">
+    🔑 Googleでログイン
+  </button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script>
 // ════════════════════════════════════
 //  Firebase Firestore 連携
@@ -735,8 +749,13 @@ tr.h-short td:first-child { border-left:3px solid #f87171; }
     messagingSenderId: '604201650756',
     appId: '1:604201650756:web:65219ae816bac1e1574a11'
   });
-  window._db = firebase.firestore();
+  window._db   = firebase.firestore();
+  window._auth = firebase.auth();
+  window._googleProvider = new firebase.auth.GoogleAuthProvider();
 })();
+
+window.googleSignIn  = function() { window._auth.signInWithPopup(window._googleProvider); };
+window.googleSignOut = function() { window._auth.signOut(); };
 
 window._fbReady = false;
 
@@ -3196,10 +3215,22 @@ if(!fxRates.ETH) fxRates.ETH=null;
 if(!fxRates.XRP) fxRates.XRP=null;
 
 renderAll();
-window._fbInit().catch(function(e){ console.warn('fbInit:', e); });
 if(localStorage.getItem('portfolio_v6')){
   document.getElementById('lastUpdated').textContent='最終更新: '+new Date().toLocaleString('ja-JP');
 }
+// 認証状態を監視してからFirestoreを開始
+window._auth.onAuthStateChanged(function(user) {
+  var overlay = document.getElementById('loginOverlay');
+  var userInfo = document.getElementById('dashUserInfo');
+  if (user) {
+    if (overlay) overlay.style.display = 'none';
+    if (userInfo) userInfo.textContent = user.displayName || user.email || '';
+    window._fbInit().catch(function(e){ console.warn('fbInit:', e); });
+  } else {
+    if (overlay) overlay.style.display = 'flex';
+    window._fbReady = false;
+  }
+});
 // 前回のタブを復元
 (()=>{
   const saved = localStorage.getItem('portfolio_v6_tab');
