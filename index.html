@@ -149,6 +149,28 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
   .row3{grid-template-columns:1fr 1fr;}
   .sc-bars{grid-template-columns:1fr 1fr;}
 }
+
+/* ── タブ ── */
+.tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:57px;z-index:90;}
+.tab-btn{flex:1;padding:11px 6px;font-size:12px;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);cursor:pointer;transition:all .15s;}
+.tab-btn.active{color:var(--green);border-bottom-color:var(--green);}
+
+/* ── 履歴カード ── */
+.hist-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:10px;}
+
+/* ── 統計 ── */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;}
+.stat-label{font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;}
+.stat-value{font-size:22px;font-weight:700;}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:3px;}
+.summary-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;}
+.summary-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);}
+.summary-row:last-child{border-bottom:none;}
+
+/* ── 引き上げ履歴 ── */
+.adj-item{display:flex;flex-direction:column;gap:3px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.adj-item:last-child{border-bottom:none;}
 </style>
 </head>
 <body>
@@ -157,18 +179,36 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
   <h1>📈 トレードログ</h1>
   <div class="header-right">
     <span class="sync-status sync-ing" id="syncStatus">⏳ 接続中...</span>
+    <a href="dashboard.html" class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 10px;text-decoration:none">📊 ダッシュボード</a>
     <button class="btn btn-sm btn-ghost" onclick="document.getElementById('importFile').click()" style="font-size:11px;padding:4px 10px;">📥 インポート</button>
     <input type="file" id="importFile" accept=".json" style="display:none" onchange="importFromFile(this)">
     <span id="lastUpdate"></span>
   </div>
 </header>
 
-<div class="container">
+<nav class="tabs">
+  <button class="tab-btn active" id="tab-btn-watch"   onclick="switchTab('watch')">📈 ウォッチリスト</button>
+  <button class="tab-btn"        id="tab-btn-history" onclick="switchTab('history')">📋 履歴</button>
+  <button class="tab-btn"        id="tab-btn-stats"   onclick="switchTab('stats')">📊 統計</button>
+</nav>
+
+<div class="container" id="tab-watch">
   <div class="list-header">
     <div class="list-title">ウォッチリスト</div>
     <button class="btn btn-sm btn-ghost" onclick="updateAllPrices()">📡 株価一括更新</button>
   </div>
   <div id="watchlist"></div>
+</div>
+
+<div class="container" id="tab-history" style="display:none">
+  <div class="list-header">
+    <div class="list-title">決済履歴</div>
+  </div>
+  <div id="historylist"></div>
+</div>
+
+<div class="container" id="tab-stats" style="display:none">
+  <div id="statsview"></div>
 </div>
 
 <!-- 銘柄追加モーダル -->
@@ -300,6 +340,40 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
   </div>
 </div>
 
+<!-- ライン引き上げモーダル -->
+<div class="modal" id="adjustModal">
+  <div class="modal-inner">
+    <div class="modal-title" id="adjust-title">📈 ライン引き上げ</div>
+    <div id="adjust-preview" style="margin-bottom:14px;"></div>
+    <div class="row row1">
+      <div class="fg"><label>メモ（任意）</label><input id="adj-memo" placeholder="例: 高値更新したので引き上げ"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sm btn-ghost" onclick="closeAdjustModal()">キャンセル</button>
+      <button class="btn btn-primary" style="width:auto;padding:10px 24px;" onclick="submitAdjust()">更新する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ライン手動編集モーダル -->
+<div class="modal" id="editLinesModal">
+  <div class="modal-inner">
+    <div class="modal-title" id="editlines-title">✏️ ライン編集</div>
+    <div id="editlines-info" style="background:var(--surface2);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--muted);"></div>
+    <div class="row row2">
+      <div class="fg"><label>目標価格 (円)</label><input id="el-target" type="number" placeholder="例: 1200"></div>
+      <div class="fg"><label>損切ライン (円)</label><input id="el-loss" type="number" placeholder="例: 950"></div>
+    </div>
+    <div class="row row1">
+      <div class="fg"><label>メモ（任意）</label><input id="el-memo" placeholder="例: 決算後に目標を上方修正"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sm btn-ghost" onclick="closeEditLinesModal()">キャンセル</button>
+      <button class="btn btn-primary" style="width:auto;padding:10px 24px;" onclick="submitEditLines()">更新する</button>
+    </div>
+  </div>
+</div>
+
 <button class="fab" onclick="openAddModal()" title="銘柄を追加">＋</button>
 
 <!-- 詳細モーダル -->
@@ -330,9 +404,11 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
-const stocksCol = collection(db, 'stocks');
+const stocksCol  = collection(db, 'stocks');
+const historyCol = collection(db, 'history');
 
-let stocks = [];
+let stocks  = [];
+let history = [];
 
 function setSyncStatus(state) {
   const el = document.getElementById('syncStatus');
@@ -348,6 +424,24 @@ onSnapshot(stocksCol, (snapshot) => {
   render();
   setSyncStatus('ok');
 }, () => setSyncStatus('err'));
+
+onSnapshot(historyCol, (snapshot) => {
+  history = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  history.sort((a, b) => (b.settledAt||0) - (a.settledAt||0));
+  renderHistory();
+  renderStats();
+});
+
+let activeTab = 'watch';
+window.switchTab = (tab) => {
+  activeTab = tab;
+  ['watch','history','stats'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===tab ? '' : 'none';
+    document.getElementById('tab-btn-'+t).classList.toggle('active', t===tab);
+  });
+  if(tab==='history') renderHistory();
+  if(tab==='stats') renderStats();
+};
 
 async function saveStock(s) {
   setSyncStatus('ing');
@@ -515,6 +609,87 @@ document.getElementById('detailModal').addEventListener('click', e=>{
   if(e.target===document.getElementById('detailModal')) window.closeModal();
 });
 
+let adjustingId = null;
+
+window.openAdjustModal = (id) => {
+  adjustingId = id;
+  const s = stocks.find(s => String(s.id)===String(id));
+  const newTarget = Math.round(s.current * 1.10);
+  const newLoss   = Math.round(s.current * 0.95);
+  document.getElementById('adjust-title').textContent = `📈 ライン引き上げ — ${s.name}`;
+  document.getElementById('adj-memo').value = '';
+  document.getElementById('adjust-preview').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+      <div style="background:var(--surface2);border-radius:8px;padding:10px">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">目標価格</div>
+        <div style="font-size:13px;color:var(--muted);text-decoration:line-through">¥${(s.target||0).toLocaleString()}</div>
+        <div style="font-size:17px;font-weight:700;color:var(--blue)">→ ¥${newTarget.toLocaleString()}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:10px">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">損切ライン</div>
+        <div style="font-size:13px;color:var(--muted);text-decoration:line-through">¥${(s.loss||0).toLocaleString()}</div>
+        <div style="font-size:17px;font-weight:700;color:var(--red)">→ ¥${newLoss.toLocaleString()}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);text-align:center">現在値 ¥${s.current.toLocaleString()} を基準に 目標+10% / 損切-5% で自動計算</div>`;
+  document.getElementById('adjustModal').classList.add('open');
+};
+window.closeAdjustModal = () => {
+  document.getElementById('adjustModal').classList.remove('open');
+  adjustingId = null;
+};
+document.getElementById('adjustModal').addEventListener('click', e => {
+  if(e.target===document.getElementById('adjustModal')) window.closeAdjustModal();
+});
+
+window.submitAdjust = async () => {
+  const s = stocks.find(s => String(s.id)===String(adjustingId));
+  if(!s) return;
+  const newTarget = Math.round(s.current * 1.10);
+  const newLoss   = Math.round(s.current * 0.95);
+  const memo = document.getElementById('adj-memo').value.trim();
+  const adj = { at: Date.now(), type: 'auto', prevTarget: s.target||null, prevLoss: s.loss||null, newTarget, newLoss, memo };
+  s.adjustments = [...(s.adjustments||[]), adj];
+  s.target = newTarget;
+  s.loss   = newLoss;
+  await saveStock(s);
+  window.closeAdjustModal();
+  showToast(`✅ ライン更新（目標 ¥${newTarget.toLocaleString()} / 損切 ¥${newLoss.toLocaleString()}）`);
+};
+
+window.openEditLinesModal = (id) => {
+  adjustingId = id;
+  const s = stocks.find(s => String(s.id)===String(id));
+  document.getElementById('editlines-title').textContent = `✏️ ライン編集 — ${s.name}`;
+  document.getElementById('editlines-info').textContent = `現在: 目標 ¥${(s.target||0).toLocaleString()} / 損切 ¥${(s.loss||0).toLocaleString()}`;
+  document.getElementById('el-target').value = s.target || '';
+  document.getElementById('el-loss').value   = s.loss   || '';
+  document.getElementById('el-memo').value   = '';
+  document.getElementById('editLinesModal').classList.add('open');
+};
+window.closeEditLinesModal = () => {
+  document.getElementById('editLinesModal').classList.remove('open');
+  adjustingId = null;
+};
+document.getElementById('editLinesModal').addEventListener('click', e => {
+  if(e.target===document.getElementById('editLinesModal')) window.closeEditLinesModal();
+});
+
+window.submitEditLines = async () => {
+  const s = stocks.find(s => String(s.id)===String(adjustingId));
+  if(!s) return;
+  const newTarget = parseFloat(document.getElementById('el-target').value) || null;
+  const newLoss   = parseFloat(document.getElementById('el-loss').value)   || null;
+  const memo = document.getElementById('el-memo').value.trim();
+  const adj = { at: Date.now(), type: 'manual', prevTarget: s.target||null, prevLoss: s.loss||null, newTarget, newLoss, memo };
+  s.adjustments = [...(s.adjustments||[]), adj];
+  s.target = newTarget;
+  s.loss   = newLoss;
+  await saveStock(s);
+  window.closeEditLinesModal();
+  showToast(`✅ ライン更新（目標 ¥${(newTarget||0).toLocaleString()} / 損切 ¥${(newLoss||0).toLocaleString()}）`);
+};
+
 let settlingId = null;
 
 window.openSettleModal = (id) => {
@@ -605,6 +780,94 @@ window.importFromFile = async function(input) {
   };
   reader.readAsText(file);
 };
+
+function renderHistory() {
+  const el = document.getElementById('historylist');
+  if (!el) return;
+  if (!history.length) {
+    el.innerHTML = `<div class="empty"><div class="icon">📋</div>決済記録はまだありません<br><small style="margin-top:8px;display:block">銘柄カードの「決済」ボタンから記録できます</small></div>`;
+    return;
+  }
+  el.innerHTML = history.map(h => {
+    const isWin = (h.plPct||0) >= 0;
+    const plSign = isWin ? '+' : '';
+    const plColor = isWin ? 'var(--red)' : 'var(--green)';
+    const plYenStr = h.plYen != null ? `(${isWin?'+':''}¥${h.plYen.toLocaleString()})` : '';
+    return `<div class="hist-card">
+      <div class="sc-top">
+        <div>
+          <div class="sc-name">${h.name}</div>
+          <div class="sc-code">${h.code||'—'} · 決済日: ${h.sellDate||'—'}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:20px;font-weight:700;color:${plColor}">${plSign}${h.plPct}%</div>
+          <div style="font-size:12px;color:${plColor}">${plYenStr}</div>
+        </div>
+      </div>
+      <div class="sc-bars">
+        <div class="sc-bar"><div class="sc-bar-label">買値</div><div class="sc-bar-val col-buy">¥${(h.buy||0).toLocaleString()}</div></div>
+        <div class="sc-bar"><div class="sc-bar-label">売値</div><div class="sc-bar-val" style="color:${plColor}">¥${(h.sellPrice||0).toLocaleString()}</div></div>
+        <div class="sc-bar"><div class="sc-bar-label">株数</div><div class="sc-bar-val">${h.qty||'—'}株</div></div>
+      </div>
+      ${h.sellReason ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">📝 売った理由: ${h.sellReason}</div>` : ''}
+      ${h.sellMemo   ? `<div style="font-size:12px;color:var(--muted);margin-top:4px">💭 ${h.sellMemo}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderStats() {
+  const el = document.getElementById('statsview');
+  if (!el) return;
+  if (!history.length) {
+    el.innerHTML = `<div class="empty"><div class="icon">📊</div>決済記録がないため統計が表示できません</div>`;
+    return;
+  }
+  const wins   = history.filter(h => (h.plPct||0) >= 0);
+  const losses = history.filter(h => (h.plPct||0) <  0);
+  const winRate  = (wins.length / history.length * 100).toFixed(1);
+  const avgWin   = wins.length   ? (wins.reduce((s,h)=>s+(h.plPct||0),0)/wins.length).toFixed(2)   : '—';
+  const avgLoss  = losses.length ? (losses.reduce((s,h)=>s+(h.plPct||0),0)/losses.length).toFixed(2) : '—';
+  const totalPL  = history.reduce((s,h) => s+(h.plYen||0), 0);
+  const best     = history.reduce((a,b) => (a.plYen||0)>(b.plYen||0)?a:b);
+  const worst    = history.reduce((a,b) => (a.plYen||0)<(b.plYen||0)?a:b);
+  const plColor  = totalPL >= 0 ? 'var(--red)' : 'var(--green)';
+  el.innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">勝率</div>
+        <div class="stat-value ${parseFloat(winRate)>=50?'up':'down'}">${winRate}%</div>
+        <div class="stat-sub">${wins.length}勝 ${losses.length}敗</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">平均利益</div>
+        <div class="stat-value up">${wins.length ? '+'+avgWin+'%' : '—'}</div>
+        <div class="stat-sub">${wins.length}件</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">平均損失</div>
+        <div class="stat-value down">${losses.length ? avgLoss+'%' : '—'}</div>
+        <div class="stat-sub">${losses.length}件</div>
+      </div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-row">
+        <span style="color:var(--muted);font-size:13px">累計損益</span>
+        <span style="font-size:20px;font-weight:700;color:${plColor}">${totalPL>=0?'+':''}¥${totalPL.toLocaleString()}</span>
+      </div>
+      <div class="summary-row">
+        <span style="color:var(--muted);font-size:13px">総トレード数</span>
+        <span style="font-size:16px;font-weight:700">${history.length}件</span>
+      </div>
+      <div class="summary-row">
+        <span style="color:var(--muted);font-size:13px">🏆 最大利益</span>
+        <span style="font-size:13px;font-weight:600;color:var(--red)">${best.name} +${best.plPct}% ${best.plYen!=null?'(+¥'+best.plYen.toLocaleString()+')':''}</span>
+      </div>
+      <div class="summary-row">
+        <span style="color:var(--muted);font-size:13px">💧 最大損失</span>
+        <span style="font-size:13px;font-weight:600;color:var(--green)">${worst.name} ${worst.plPct}% ${worst.plYen!=null?'(¥'+worst.plYen.toLocaleString()+')':''}</span>
+      </div>
+    </div>`;
+}
 
 function chartUrl(code) {
   if (!code) return null;
