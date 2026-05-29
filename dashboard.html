@@ -1,0 +1,3394 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>資産ダッシュボード</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
+:root {
+  --bg:#0d0f14; --surface:#161921; --surface2:#1e2230; --surface3:#252a3a;
+  --border:#2a2f3e; --text:#e8eaf0; --text-muted:#6b7185;
+  --accent:#4ade9a; --accent2:#60a5fa; --danger:#f87171; --nisa:#a78bfa; --warn:#fb923c;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+
+/* Header */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.header-title{font-size:16px;font-weight:700;color:var(--accent);}
+.header-sub{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-muted);margin-top:2px;}
+.header-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+
+/* FX Bar */
+.fx-bar{background:var(--surface2);border-bottom:1px solid var(--border);padding:7px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.fx-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.7px;}
+.fx-rates{display:flex;gap:14px;flex-wrap:wrap;}
+.fx-item{display:flex;align-items:center;gap:5px;}
+.fx-pair{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-muted);}
+.fx-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--accent2);}
+.fx-stale{color:var(--text-muted)!important;}
+
+/* Tabs */
+.tab-nav{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;display:flex;}
+.tab-btn{background:transparent;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:500;color:var(--text-muted);padding:11px 18px;border-bottom:2px solid transparent;transition:all .15s;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-page{display:none;}
+.tab-page.active{display:block;}
+
+/* Buttons */
+.btn{padding:6px 13px;border-radius:6px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:12px;font-weight:500;transition:all .15s;}
+.btn-primary{background:var(--accent);color:#0d0f14;}
+.btn-primary:hover{filter:brightness(1.1);}
+.btn-secondary{background:var(--accent2);color:#0d0f14;}
+.btn-secondary:hover{filter:brightness(1.1);}
+.btn-ghost{background:transparent;color:var(--text-muted);border:1px solid var(--border);}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.btn-danger{background:transparent;color:var(--danger);border:1px solid transparent;padding:3px 8px;font-size:12px;}
+.btn-danger:hover{background:rgba(248,113,113,.1);}
+.btn-loading{opacity:.6;pointer-events:none;}
+
+/* Main */
+.main{max-width:1400px;margin:0 auto;padding:20px;}
+
+/* Cards */
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:20px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.card-accent{border-color:var(--accent);}
+.card-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;}
+.card-value{font-family:'DM Mono',monospace;font-size:19px;font-weight:500;}
+.card-sub{font-size:11px;color:var(--text-muted);margin-top:3px;font-family:'DM Mono',monospace;}
+
+/* Charts */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:20px;}
+@media(max-width:900px){.charts-grid{grid-template-columns:1fr;}}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;}
+.chart-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:12px;}
+canvas{display:block;margin:0 auto;}
+.legend{margin-top:10px;}
+.legend-item{display:flex;align-items:center;gap:7px;margin-bottom:5px;font-size:11px;}
+.legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.legend-name{flex:1;color:var(--text-muted);}
+.legend-val{font-family:'DM Mono',monospace;color:var(--text);font-size:11px;}
+.legend-total{margin-top:8px;padding-top:7px;border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:11px;color:var(--text);display:flex;justify-content:space-between;}
+
+/* Agg tables */
+.agg-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
+@media(max-width:700px){.agg-grid{grid-template-columns:1fr;}}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{text-align:left;padding:7px 10px;color:var(--text-muted);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.7px;border-bottom:1px solid var(--border);}
+tbody td{padding:8px 10px;border-bottom:1px solid rgba(42,47,62,.5);vertical-align:middle;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover{background:rgba(255,255,255,.02);}
+.mono{font-family:'DM Mono',monospace;}
+.text-right{text-align:right;}
+.text-accent{color:var(--accent);}
+.text-muted-c{color:var(--text-muted);}
+
+/* Target allocation */
+.target-section{margin-bottom:20px;}
+.target-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.target-label{font-size:12px;width:110px;flex-shrink:0;color:var(--text-muted);}
+.target-track{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:visible;position:relative;}
+.target-fill{height:100%;border-radius:4px;transition:width .4s;}
+.target-marker{position:absolute;top:-4px;width:2px;height:16px;background:var(--warn);border-radius:1px;}
+.target-pct{font-family:'DM Mono',monospace;font-size:11px;width:80px;text-align:right;}
+.target-diff{font-family:'DM Mono',monospace;font-size:11px;width:60px;text-align:right;}
+
+/* PnL ranking */
+.ranking-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
+@media(max-width:700px){.ranking-grid{grid-template-columns:1fr;}}
+.rank-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid rgba(42,47,62,.4);}
+.rank-num{font-family:'DM Mono',monospace;font-size:12px;color:var(--text-muted);width:20px;text-align:center;}
+.rank-name{flex:1;font-size:12px;font-weight:500;}
+.rank-val{font-family:'DM Mono',monospace;font-size:12px;}
+
+/* Broker accordion */
+.broker-section{margin-bottom:20px;}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);}
+.broker-group{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden;}
+.broker-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;transition:background .15s;user-select:none;}
+.broker-header:hover{background:var(--surface2);}
+.broker-header-left{display:flex;align-items:center;gap:10px;}
+.broker-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.broker-name{font-weight:600;font-size:13px;}
+.broker-count{font-size:11px;color:var(--text-muted);}
+.broker-header-right{display:flex;align-items:center;gap:14px;}
+.broker-total{font-family:'DM Mono',monospace;font-size:14px;color:var(--accent);}
+.broker-chevron{color:var(--text-muted);transition:transform .2s;font-size:11px;}
+.broker-group.open .broker-chevron{transform:rotate(180deg);}
+.broker-body{display:none;border-top:1px solid var(--border);overflow-x:auto;}
+.broker-group.open .broker-body{display:block;}
+.broker-body table{min-width:720px;}
+.broker-body thead th{background:var(--surface2);}
+.nisa-badge{display:inline-block;background:rgba(167,139,250,.15);color:var(--nisa);border:1px solid rgba(167,139,250,.3);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;}
+.ticker-badge{font-family:'DM Mono',monospace;font-size:10px;background:var(--surface3);border-radius:3px;padding:1px 5px;color:var(--text-muted);}
+.cash-badge{display:inline-block;background:rgba(96,165,250,.1);color:var(--accent2);border:1px solid rgba(96,165,250,.25);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;}
+.empty-state{text-align:center;padding:40px 20px;color:var(--text-muted);}
+.empty-state .icon{font-size:28px;margin-bottom:10px;opacity:.5;}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:580px;padding:26px;max-height:92vh;overflow-y:auto;}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:22px;color:var(--accent);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:500px){.form-grid{grid-template-columns:1fr;}}
+.form-group{display:flex;flex-direction:column;gap:5px;}
+.form-group.full{grid-column:1/-1;}
+.form-label{font-size:10px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;}
+.form-label span{color:var(--text-muted);font-weight:400;text-transform:none;font-size:10px;}
+.form-input,.form-select,.form-textarea{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 11px;font-family:'Noto Sans JP',sans-serif;font-size:13px;outline:none;transition:border-color .15s;width:100%;}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent);}
+.form-select option{background:var(--surface2);}
+.form-textarea{resize:vertical;min-height:52px;}
+.checkbox-row{display:flex;align-items:center;gap:9px;margin-top:3px;}
+.checkbox-row input[type=checkbox]{width:15px;height:15px;accent-color:var(--nisa);cursor:pointer;}
+.checkbox-row label{font-size:13px;cursor:pointer;}
+.modal-actions{display:flex;gap:9px;justify-content:flex-end;margin-top:22px;}
+.calc-preview{background:var(--surface3);border-radius:6px;padding:9px 13px;font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);margin-top:4px;white-space:pre-line;}
+
+/* Target modal */
+.target-input-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-bottom:8px;}
+
+/* History tab */
+.history-top{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+.history-canvas-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px;}
+.breakdown-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:20px;}
+.no-snaps{text-align:center;padding:50px 20px;color:var(--text-muted);}
+.no-snaps .icon{font-size:32px;margin-bottom:10px;opacity:.4;}
+.snap-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto;}
+
+/* CSV export */
+.csv-btn{background:transparent;color:var(--accent2);border:1px solid var(--accent2);padding:5px 12px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;}
+.csv-btn:hover{background:rgba(96,165,250,.1);}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--accent);color:var(--accent);padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;z-index:999;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast.error{border-color:var(--danger);color:var(--danger);}
+
+@media(max-width:600px){
+  .header{padding:10px 14px;}
+  .fx-bar{padding:6px 14px;}
+  .main{padding:14px 12px;}
+  .summary-grid{grid-template-columns:1fr 1fr;}
+  .card-value{font-size:16px;}
+  .ranking-grid{grid-template-columns:1fr;}
+}
+
+/* ─── プライバシーモード ─── */
+/* privacy-mode: handled by JS fmtJPY */
+/* ウォッチリスト */
+.watch-table { width:100%; border-collapse:collapse; font-size:13px; }
+.watch-table th { text-align:left; padding:8px 10px; font-size:11px; color:var(--text-muted); border-bottom:1px solid var(--border); font-weight:500; }
+.watch-table td { padding:9px 10px; border-bottom:1px solid rgba(255,255,255,.04); vertical-align:middle; }
+.watch-table tr:hover td { background:rgba(255,255,255,.02); }
+.watch-input { background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:5px; padding:4px 7px; font-size:12px; width:110px; font-family:'DM Mono',monospace; }
+.watch-input:focus { outline:none; border-color:var(--accent); }
+.watch-memo { width:180px; }
+.watch-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:16px; }
+.watch-card-header { padding:12px 16px; background:var(--surface2); display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); }
+.watch-summary-box { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+.watch-stat { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+.watch-stat-label { font-size:11px; color:var(--text-muted); margin-bottom:4px; }
+.watch-stat-val { font-size:18px; font-weight:700; font-family:'DM Mono',monospace; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+/* 時間軸バッジ */
+.horizon-btn { background:none; border:none; cursor:pointer; font-size:13px; padding:1px 3px; border-radius:4px; transition:transform 0.1s; vertical-align:middle; }
+.horizon-btn:hover { transform:scale(1.3); }
+.horizon-filter-bar { display:flex; gap:4px; align-items:center; }
+.horizon-filter-btn { font-size:11px; padding:3px 9px; border-radius:12px; border:1px solid var(--border); background:var(--surface2); color:var(--text-muted); cursor:pointer; transition:all 0.15s; }
+.horizon-filter-btn.active { background:var(--accent2); color:#fff; border-color:var(--accent2); }
+tr.h-long  td:first-child { border-left:3px solid #4ade80; }
+tr.h-mid   td:first-child { border-left:3px solid #facc15; }
+tr.h-short td:first-child { border-left:3px solid #f87171; }
+
+
+/* ── モバイル対応 ── */
+@media (max-width: 640px) {
+  .topbar { flex-wrap:wrap; gap:6px; padding:8px 12px; }
+  .topbar-left { flex:1 1 100%; }
+  .topbar-right { flex:1 1 100%; justify-content:flex-start; flex-wrap:wrap; gap:4px; }
+  .tab-bar { overflow-x:auto; -webkit-overflow-scrolling:touch; gap:4px; padding:0 8px; }
+  .tab-btn { font-size:11px; padding:5px 10px; white-space:nowrap; }
+  .tab-page { padding:12px 8px; }
+  .summary-cards { grid-template-columns:1fr 1fr; gap:8px; }
+  .summary-card { padding:12px; }
+  .summary-card .mono { font-size:18px; }
+  .agg-table th, .agg-table td { font-size:11px; padding:5px 6px; }
+  .watch-table th, .watch-table td { font-size:11px; padding:5px 6px; }
+  .broker-section { margin-bottom:16px; }
+  .holding-row td { font-size:11px; padding:5px 4px; }
+  .donut-wrap { flex-direction:column; }
+  .donut-legend { font-size:11px; }
+  .btn { font-size:11px; padding:5px 10px; }
+  #priceBtn, #shortPriceBtn, #shortPriceBtn2 { font-size:11px; padding:5px 8px; }
+  .watch-card { margin-bottom:12px; }
+  .watch-card-header { flex-wrap:wrap; gap:4px; }
+  /* グリッドをモバイルで1列 */
+  [style*="grid-template-columns:repeat(3"] { grid-template-columns:1fr !important; }
+  [style*="grid-template-columns:repeat(2"] { grid-template-columns:1fr 1fr !important; }
+  .modal-inner { width:95vw !important; max-width:none !important; }
+  /* サマリーの3列グリッドを1列に */
+  div[style*="grid-template-columns:repeat(3,1fr)"] { grid-template-columns:1fr 1fr !important; }
+}
+@media (max-width: 380px) {
+  .summary-cards { grid-template-columns:1fr; }
+  .topbar-right button { font-size:10px; padding:3px 6px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div>
+    <div class="header-title">📊 資産ダッシュボード</div>
+    <div class="header-sub" id="lastUpdated">最終更新: —</div>
+  </div>
+  <div class="header-actions">
+    <a href="index.html" class="btn btn-ghost" style="text-decoration:none">📈 トレードログ</a>
+    <button class="btn btn-ghost" onclick="exportCSV()">📄 CSV出力</button>
+    <button class="btn btn-ghost" onclick="exportJSON()">💾 バックアップ</button>
+    <button class="btn btn-ghost" onclick="takeSnapshot()">📈 推移グラフ更新</button>
+    <button class="btn btn-secondary" onclick="openImportModal()">📥 CSVインポート</button>
+    <button class="btn btn-primary" onclick="openModal()">＋ 銘柄追加</button>
+  </div>
+</div>
+
+<!-- FX Bar -->
+<div class="fx-bar">
+  <div class="fx-label">為替</div>
+  <div class="fx-rates">
+    <div class="fx-item"><span class="fx-pair">USD/JPY</span><span class="fx-val" id="fx-usd">—</span></div>
+    <div class="fx-item"><span class="fx-pair">HKD/JPY</span><span class="fx-val" id="fx-hkd">—</span></div>
+    <div class="fx-item"><span class="fx-pair">BTC/JPY</span><span class="fx-val" id="fx-btc">—</span></div>
+    <div class="fx-item"><span class="fx-pair">ETH/JPY</span><span class="fx-val" id="fx-eth">—</span></div>
+    <div class="fx-item"><span class="fx-pair">XRP/JPY</span><span class="fx-val" id="fx-xrp">—</span></div>
+  </div>
+  <button class="btn btn-ghost" id="fxBtn" onclick="fetchAllFX()" style="font-size:11px;padding:4px 10px;">🔄 為替更新</button>
+      <button class="btn btn-ghost" id="privacyBtn" onclick="togglePrivacy()" title="金額表示の切替" style="font-size:11px;padding:4px 10px;">👁 金額表示</button>
+        <button class="btn btn-ghost" onclick="exportForMobile()" style="font-size:11px;padding:4px 10px;color:#60a5fa;border-color:#60a5fa;" title="クリックで共有シート表示（AirDrop・メール・LINEなど）">📱 スマホ共有</button>
+        <button class="btn btn-ghost" onclick="promptFinnhubKey()" style="font-size:11px;padding:4px 10px;color:#f59e0b;border-color:#f59e0b;" title="Finnhub APIキー設定（米国株取得精度向上）" id="finnhubBtn">🔑 Finnhub</button>
+  <span class="fx-label" id="fxUpdated"></span>
+</div>
+
+<!-- Tabs -->
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('dashboard')">📊 ダッシュボード</button>
+  <button class="tab-btn" onclick="switchTab('history')">📈 推移グラフ</button>
+  <button class="tab-btn" onclick="switchTab('watch')">🔴 ウォッチリスト</button>
+  <button class="tab-btn" onclick="switchTab('virtual')">🎮 仮想トレード</button>
+</div>
+
+<!-- ═══ DASHBOARD TAB ═══ -->
+<div id="tab-dashboard" class="tab-page active">
+<div class="main">
+
+  <!-- Summary cards -->
+  <div class="summary-grid">
+    <div class="card card-accent">
+      <div class="card-label">総資産（円換算）</div>
+      <div class="card-value" id="totalJPY" style="color:var(--accent)">¥ —</div>
+      <div class="card-sub" id="totalCount">0件</div>
+    </div>
+    <div class="card">
+      <div class="card-label">投資資産</div>
+      <div class="card-value" id="investJPY" style="color:var(--accent2)">¥ —</div>
+      <div class="card-sub" id="cashPct">現金比率 —</div>
+    </div>
+    <div class="card">
+      <div class="card-label">NISA合計</div>
+      <div class="card-value" id="totalNISA" style="color:var(--nisa)">¥ —</div>
+      <div class="card-sub" id="nisaCount">0銘柄</div>
+    </div>
+    <div class="card">
+      <div class="card-label">含み損益</div>
+      <div class="card-value" id="totalPnL">¥ —</div>
+      <div class="card-sub" id="totalPnLPct">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">口座数</div>
+      <div class="card-value" id="brokerCount" style="color:var(--accent2)">—</div>
+      <div class="card-sub">証券口座</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">カテゴリ別</div>
+      <canvas id="catChart" width="180" height="180"></canvas>
+      <div class="legend" id="catLegend"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">証券会社別</div>
+      <canvas id="brokerChart" width="180" height="180"></canvas>
+      <div class="legend" id="brokerLegend"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">通貨別</div>
+      <canvas id="currencyChart" width="180" height="180"></canvas>
+      <div class="legend" id="currencyLegend"></div>
+    </div>
+  </div>
+
+  <!-- Agg tables -->
+  <div class="agg-grid">
+    <div class="chart-card">
+      <div class="chart-title" style="margin-bottom:8px">証券会社別集計</div>
+      <table id="brokerAggTable"><thead><tr><th>証券会社</th><th class="text-right">評価額</th><th class="text-right">割合</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title" style="margin-bottom:8px">通貨別集計</div>
+      <table id="currencyAggTable"><thead><tr><th>通貨</th><th class="text-right">評価額</th><th class="text-right">割合</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <!-- Target allocation -->
+  <div class="target-section">
+    <div class="section-header">
+      <div class="section-title">目標配分 vs 現在</div>
+      <button class="btn btn-ghost" onclick="openTargetModal()" style="font-size:11px;padding:4px 10px;">⚙️ 目標を設定</button>
+    </div>
+    <div class="chart-card">
+      <div id="targetBars"><div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px">目標配分が未設定です。右上の「目標を設定」から入力してください。</div></div>
+    </div>
+  </div>
+
+  <!-- PnL ranking -->
+  <div class="ranking-grid">
+    <div class="chart-card">
+      <div class="chart-title" style="margin-bottom:8px">💹 含み益 Top5</div>
+      <div id="gainRanking"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title" style="margin-bottom:8px">📉 含み損 Top5</div>
+      <div id="lossRanking"></div>
+    </div>
+  </div>
+
+  <!-- Broker accordion -->
+  <div class="broker-section">
+    <div class="section-header">
+      <div class="section-title">証券会社別 保有銘柄</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn btn-ghost" id="priceBtn" onclick="fetchAllPrices()" style="font-size:11px;padding:4px 10px;">📡 株価一括更新</button>
+        <button class="btn btn-ghost" onclick="fetchAllPrices(true)" style="font-size:11px;padding:4px 10px;color:#a78bfa;border-color:#a78bfa;">⬜ 未取得のみ</button>
+        <button class="btn btn-ghost" id="shortPriceBtn" onclick="fetchShortPrices()" style="font-size:11px;padding:4px 10px;color:#f87171;border-color:#f87171;">🔴 短期のみ更新</button>
+        <div class="horizon-filter-bar">
+          <button class="horizon-filter-btn active" onclick="setHorizonFilter('all',this)">全て</button>
+          <button class="horizon-filter-btn" onclick="setHorizonFilter('long',this)">🟢長期</button>
+          <button class="horizon-filter-btn" onclick="setHorizonFilter('mid',this)">🟡中期</button>
+          <button class="horizon-filter-btn" onclick="setHorizonFilter('short',this)">🔴短期</button>
+        </div>
+        <input class="form-input" id="searchInput" placeholder="🔍 検索..." style="width:130px;padding:5px 9px;font-size:12px" oninput="renderBrokerGroups()">
+      </div>
+    </div>
+    <div id="brokerAccordion"></div>
+    <div class="empty-state" id="emptyState" style="display:none">
+      <div class="icon">📂</div>
+      <div>銘柄がまだありません</div>
+      <div style="margin-top:5px;font-size:12px">右上の「＋ 銘柄追加」から追加してください</div>
+    </div>
+  </div>
+
+</div>
+</div><!-- /tab-dashboard -->
+
+<!-- ═══ HISTORY TAB ═══ -->
+<div id="tab-history" class="tab-page">
+<div class="main">
+  <div class="history-top">
+    <div class="section-title" style="font-size:12px">資産推移グラフ（週次記録）</div>
+    <button class="btn btn-primary" onclick="takeSnapshot()">📈 推移グラフ更新</button>
+    <button class="btn btn-ghost" onclick="clearSnapshots()" style="font-size:11px">🗑️ 履歴リセット</button>
+  </div>
+
+  <!-- 推移折れ線グラフ -->
+  <div class="history-canvas-wrap">
+    <div id="noSnapsMsg" class="no-snaps">
+      <div class="icon">📈</div>
+      <div>記録がまだありません</div>
+      <div style="margin-top:6px;font-size:12px">「📈 推移グラフ更新」を押すと週次推移が記録されます</div>
+    </div>
+    <canvas id="historyChart" style="display:none;width:100%;max-height:340px"></canvas>
+  </div>
+
+  <!-- 資産分類ごとの内訳グラフ -->
+  <div class="breakdown-grid" id="breakdownGrid"></div>
+
+  <!-- スナップショット履歴テーブル -->
+  <div class="snap-table-wrap">
+    <table>
+      <thead><tr>
+        <th>記録日</th><th>週</th>
+        <th class="text-right">総資産</th>
+        <th class="text-right">前週比</th>
+        <th class="text-right">現金比率</th>
+        <th class="text-right">NISA</th>
+        <th class="text-right">銘柄数</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="snapTableBody"></tbody>
+    </table>
+  </div>
+</div>
+</div><!-- /tab-history -->
+
+<div id="tab-watch" class="tab-page">
+<div class="main">
+  <div class="section-header" style="margin-bottom:16px">
+    <div class="section-title">🔴 ウォッチリスト <span style="font-size:12px;font-weight:400;color:var(--text-muted)">短期タグの銘柄</span></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div id="watchSummary" style="font-size:12px;color:var(--text-muted)"></div>
+      <button class="btn btn-ghost" id="shortPriceBtn2" onclick="fetchShortPricesWatch()" style="font-size:11px;padding:4px 10px;color:#f87171;border-color:#f87171;">🔴 株価更新</button>
+      <button class="btn btn-ghost" onclick="fetchShortPricesWatch(true)" style="font-size:11px;padding:4px 10px;color:#a78bfa;border-color:#a78bfa;">⬜ 未取得のみ</button>
+    </div>
+  </div>
+  <div id="watchContent"></div>
+</div>
+</div><!-- /tab-watch -->
+
+<div id="tab-virtual" class="tab-page">
+<div class="main">
+  <div class="section-header" style="margin-bottom:16px">
+    <div class="section-title">🎮 仮想トレード <span style="font-size:12px;font-weight:400;color:var(--text-muted)">スイングトレード練習</span></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-ghost" onclick="fetchVirtualPrices()" style="font-size:11px;padding:4px 10px;color:#60a5fa;border-color:#60a5fa;" id="virtualPriceBtn">📡 株価更新</button>
+      <button class="btn btn-ghost" onclick="importFromClipboard()" style="font-size:11px;padding:4px 10px;color:#a78bfa;border-color:#a78bfa;" id="coworkPasteBtn">📋 Coworkから貼り付け</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('coworkImportInput').click()" style="font-size:11px;padding:4px 10px;color:#6b7280;border-color:#6b7280;font-size:10px;">📁 JSON</button>
+      <input type="file" id="coworkImportInput" accept=".json" style="display:none" onchange="importFromCowork(this)">
+      <button class="btn btn-primary" onclick="openVirtualAddModal()" style="font-size:11px;padding:5px 12px;">＋ 仮想ポジション追加</button>
+    </div>
+  </div>
+  <div id="virtualContent"></div>
+</div>
+</div><!-- /tab-virtual -->
+
+<!-- ─── 仮想ポジション追加モーダル ─── -->
+<div class="modal-overlay" id="virtualModalOverlay">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header"><span class="modal-title">🎮 仮想ポジション追加・編集</span>
+      <button class="modal-close" onclick="closeVirtualModal()">×</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+      <input type="hidden" id="vEditId">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><div class="form-label">銘柄名</div><input class="form-input" id="vName" placeholder="ディスコ"></div>
+        <div><div class="form-label">ティッカー / 銘柄コード</div><input class="form-input" id="vTicker" placeholder="6146 / LUNR"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><div class="form-label">通貨</div>
+          <select class="form-input" id="vCurrency">
+            <option value="JPY">JPY（日本株）</option>
+            <option value="USD">USD（米国株）</option>
+          </select></div>
+        <div><div class="form-label">仮想購入日</div><input class="form-input" type="date" id="vBuyDate"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div><div class="form-label">仮想購入価格</div><input class="form-input" id="vBuyPrice" type="number" placeholder="65700" oninput="autoFillVirtualPrices(this.value)"></div>
+        <div><div class="form-label">株数</div><input class="form-input" id="vQty" type="number" placeholder="5"></div>
+        <div><div class="form-label">現在値（任意）</div><input class="form-input" id="vCurrentPrice" type="number" placeholder="自動取得"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><div class="form-label">目標価格 (+10%目安)</div><input class="form-input" id="vTargetPrice" type="number" placeholder="70000"></div>
+        <div><div class="form-label">損切りライン (-5%目安)</div><input class="form-input" id="vStopLoss" type="number" placeholder="62400"></div>
+      </div>
+      <div><div class="form-label">メモ</div><textarea class="form-input" id="vNote" rows="2" placeholder="テーマ・エントリー理由など" style="resize:vertical"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeVirtualModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveVirtualPosition()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODALS ═══ -->
+
+<!-- Add/Edit modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">銘柄を追加</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">証券会社 *</label>
+        <select class="form-select" id="f-broker">
+          <option value="">選択してください</option>
+          <option>楽天証券</option><option>SBI証券</option>
+          <option>三菱eスマート証券</option><option>PayPay証券</option>
+          <option>野村證券</option><option>野村持株会</option>
+          <option>コインチェック</option><option>GMOコイン</option>
+          <option>その他</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">銘柄名 *</label>
+        <input class="form-input" id="f-name" type="text" placeholder="例: eMAXIS Slim 全世界株式">
+      </div>
+      <div class="form-group">
+        <label class="form-label">資産分類 *</label>
+        <select class="form-select" id="f-category" onchange="onCategoryChange()">
+          <option value="">選択してください</option>
+          <option>株</option><option>債券</option><option>コモディティ</option>
+          <option>暗号通貨</option><option>投信：株</option>
+          <option>投信：債券</option><option>投信：コモディティ</option>
+          <option>現金</option><option>その他</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">通貨</label>
+        <select class="form-select" id="f-currency" onchange="updateCalc()">
+          <option>JPY</option><option>USD</option><option>HKD</option>
+          <option>BTC</option><option>ETH</option><option>XRP</option>
+          <option>その他</option>
+        </select>
+      </div>
+      <div class="form-group" id="tickerGroup">
+        <label class="form-label">ティッカー <span>（任意・株価自動取得用）</span></label>
+        <input class="form-input" id="f-ticker" type="text" placeholder="例: AAPL / 7203.T">
+      </div>
+      <div class="form-group">
+        <label class="form-label">保有数量 <span id="qtyLabel">（口数・株数）</span></label>
+        <input class="form-input" id="f-qty" type="number" step="any" placeholder="0" oninput="updateCalc()">
+      </div>
+      <div class="form-group" id="costGroup">
+        <label class="form-label">取得単価 <span>（通貨建て）</span></label>
+        <input class="form-input" id="f-cost" type="number" step="any" placeholder="0" oninput="updateCalc()">
+      </div>
+      <div class="form-group" id="priceGroup">
+        <label class="form-label" id="priceLabel">現在値 <span>（通貨建て）</span></label>
+        <input class="form-input" id="f-price" type="number" step="any" placeholder="0" oninput="updateCalc()">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">評価額プレビュー</label>
+        <div class="calc-preview" id="calcPreview">数量と現在値を入力すると自動計算されます</div>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">メモ / タグ <span>（積立中・監視中・売り検討 など）</span></label>
+        <input class="form-input" id="f-memo" type="text" placeholder="任意のメモやタグ">
+      </div>
+      <div class="form-group full">
+        <div class="checkbox-row">
+          <input type="checkbox" id="f-nisa">
+          <label for="f-nisa">NISA口座（成長投資枠・つみたて枠）</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveHolding()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- Target modal -->
+<div class="modal-overlay" id="targetModalOverlay">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title">目標配分を設定</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">各カテゴリの目標割合（%）を入力してください。合計100%にする必要はありません。</div>
+    <div id="targetInputs"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeTargetModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveTargets()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CSV IMPORT MODAL ═══ -->
+<div class="modal-overlay" id="importModalOverlay">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-title">📥 CSVインポート</div>
+
+    <!-- Step 1: 証券会社選択 + ファイル選択 -->
+    <div id="importStep1">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;line-height:1.7">
+        証券会社を選択してCSVファイルを読み込みます。文字コード（Shift-JIS/UTF-8）は自動判定します。<br>
+        <span style="color:var(--accent)">✅ 同じ証券会社の既存データは自動削除され、インポートデータで上書きされます。</span>
+      </div>
+      <div class="form-grid" style="margin-bottom:16px">
+        <div class="form-group">
+          <label class="form-label">証券会社 *</label>
+          <select class="form-select" id="imp-broker">
+            <option value="">選択してください</option>
+            <option value="sbi">SBI証券（国内）</option>
+            <option value="sbi-foreign">SBI証券（外国株・コピペ）</option>
+            <option value="rakuten">楽天証券</option>
+            <option value="nomura">野村證券</option>
+            <option value="nomura-kabu">野村持株会（コピペ）</option>
+            <option value="paypay">PayPay証券</option>
+            <option value="mitsubishi-ft">三菱UFJ eスマート証券（コピペ）</option>
+            <option value="coincheck">コインチェック</option>
+            <option value="gmo">GMOコイン</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">CSVファイル *</label>
+          <input type="file" id="imp-file" accept=".csv,.txt" class="form-input" style="padding:6px 8px;cursor:pointer">
+        </div>
+      </div>
+
+      <!-- フォーマット説明 -->
+      <div id="imp-format-hint" style="display:none;background:var(--surface3);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;line-height:1.8;color:var(--text-muted)"></div>
+
+      <!-- 汎用CSVテンプレート -->
+      <div id="imp-custom-hint" style="display:none;background:var(--surface3);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;line-height:1.8">
+        <div style="color:var(--accent2);font-weight:600;margin-bottom:6px">汎用CSV フォーマット仕様</div>
+        <div style="color:var(--text-muted)">1行目はヘッダー行として無視されます。2行目以降が1銘柄1行。</div>
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);margin-top:8px;word-break:break-all">
+          銘柄名,資産分類,通貨,保有数量,取得単価,現在値,ティッカー,NISA,メモ
+        </div>
+        <div style="color:var(--text-muted);margin-top:6px">
+          資産分類: 株/債券/投信：株/投信：債券/暗号通貨/現金/コモディティ/その他<br>
+          通貨: JPY/USD/BTC/ETH/XRP/HKD<br>
+          NISA: 1または○（NISAの場合）<br>
+          ※取得単価・現在値は省略可（空欄OK）
+        </div>
+        <button class="btn btn-ghost" onclick="downloadCustomTemplate()" style="margin-top:10px;font-size:11px">📄 テンプレートDL</button>
+      </div>
+
+      <!-- SBI外国株コピペエリア -->
+      <div id="imp-paste-area" style="display:none;margin-bottom:14px">
+        <label class="form-label">コピペしたテキストを貼り付け *</label>
+        <textarea class="form-textarea" id="imp-paste-text" rows="8"
+          placeholder="SBI証券の口座サマリーページ全体をCtrl+A→Ctrl+Cでコピーして貼り付けてください"
+          style="min-height:140px;font-size:11px;font-family:'DM Mono',monospace"></textarea>
+      </div>
+
+      <!-- フリーテキストコピペエリア（野村持株会・三菱UFJ等） -->
+      <div id="imp-freetext-area" style="display:none;margin-bottom:14px">
+        <label class="form-label" style="margin-bottom:6px">残高照会ページのテキストを貼り付け *</label>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
+          ブラウザで残高照会ページを開き <b>Ctrl+A → Ctrl+C</b> でコピーして貼り付けてください。<br>
+          対応: 三菱UFJ eスマート証券（投資信託残高照会）/ 野村持株会（持株明細）
+        </div>
+        <textarea class="form-textarea" id="imp-freetext-text" rows="10"
+          placeholder="ここにテキストを貼り付けてください..."
+          style="min-height:180px;font-size:11px;font-family:'DM Mono',monospace"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeImportModal()">キャンセル</button>
+        <button class="btn btn-secondary" onclick="parseImportCSV()">📖 読み込む</button>
+      </div>
+    </div>
+
+    <!-- Step 2: プレビュー -->
+    <div id="importStep2" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:13px;font-weight:600" id="imp-preview-title"></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost" onclick="backToImportStep1()" style="font-size:11px">← 戻る</button>
+          <button class="btn btn-secondary" onclick="importSelectAll(true)" style="font-size:11px">全選択</button>
+          <button class="btn btn-ghost" onclick="importSelectAll(false)" style="font-size:11px">全解除</button>
+        </div>
+      </div>
+
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
+        ✅ = インポート対象　❌ = スキップ（エラー）　※同証券会社の既存データは全て置き換えられます
+      </div>
+
+      <div style="max-height:380px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
+        <table style="min-width:600px;font-size:12px">
+          <thead>
+            <tr style="position:sticky;top:0;background:var(--surface2)">
+              <th style="padding:8px 10px;text-align:center;width:36px"><input type="checkbox" id="imp-check-all" onchange="importCheckAll(this.checked)" style="accent-color:var(--accent)"></th>
+              <th style="padding:8px 10px">銘柄名</th>
+              <th style="padding:8px 10px">分類</th>
+              <th style="padding:8px 10px;text-align:right">数量</th>
+              <th style="padding:8px 10px;text-align:right">取得単価</th>
+              <th style="padding:8px 10px;text-align:right">現在値</th>
+              <th style="padding:8px 10px">通貨</th>
+              <th style="padding:8px 10px">備考</th>
+            </tr>
+          </thead>
+          <tbody id="imp-preview-body"></tbody>
+        </table>
+      </div>
+
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeImportModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="executeImport()">✅ インポート実行</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════
+//  Constants & State
+// ═══════════════════════════════
+const COLORS = ['#4ade9a','#60a5fa','#f59e0b','#f472b6','#818cf8','#fb923c','#34d399','#a78bfa','#f87171','#38bdf8','#fbbf24','#e879f9'];
+const CATEGORIES = ['株','債券','コモディティ','暗号通貨','投信：株','投信：債券','投信：コモディティ','現金','その他'];
+
+let holdings = [];
+let editingId = null;
+let fxRates = { USD:null, HKD:null, BTC:null, ETH:null, XRP:null };
+let openBrokers = new Set();
+let targetAlloc = {}; // { '株': 60, '債券': 20, ... }
+
+// ═══════════════════════════════
+//  Storage
+// ═══════════════════════════════
+let watchData = {}; // {holdingId: {targetPrice, memo}}
+function saveWatchData() { localStorage.setItem('portfolio_v6_watch', JSON.stringify(watchData)); }
+function loadWatchData() { try { const d=localStorage.getItem('portfolio_v6_watch'); if(d) watchData=JSON.parse(d); } catch(e){} }
+
+function renderWatchTab() {
+  const shorts = holdings.filter(h => h.horizon === 'short' && h.category !== '現金');
+  const cash   = holdings.filter(h => h.category === '現金' || h.horizon === 'short' && h.category === '現金');
+  const allShort = holdings.filter(h => h.horizon === 'short');
+  const content = document.getElementById('watchContent');
+  const summary = document.getElementById('watchSummary');
+  if(!content) return;
+
+  const totalVal = allShort.reduce((s,h) => s+getValJPY(h), 0);
+  const totalCost = allShort.reduce((s,h) => s+getCostJPY(h), 0);
+  const totalPnL = totalVal - totalCost;
+  const pnlColor = totalPnL >= 0 ? 'var(--accent)' : 'var(--danger)';
+
+  summary.innerHTML = `合計: <b>${fmtJPY(totalVal)}</b> | 損益: <span style="color:${pnlColor}">${totalPnL>=0?'+':''}${fmtJPY(totalPnL)}</span>`;
+
+  const nonCash = allShort.filter(h => h.category !== '現金');
+  const cashItems = allShort.filter(h => h.category === '現金');
+
+  // チャートURL生成
+  function chartUrl(h) {
+    const t = (h.ticker||'').trim();
+    if(!t) return null;
+    const cur = (h.currency||'JPY').toUpperCase();
+    if(cur==='JPY') return `https://finance.yahoo.co.jp/quote/${t}.T`;
+    if(cur==='HKD') return `https://finance.yahoo.com/quote/${t.replace(/^0+/,'')}.HK`;
+    return `https://finance.yahoo.com/quote/${t}`; // USD等
+  }
+
+  const makeRows = (items) => items.map(h => {
+    const valJPY = getValJPY(h);
+    const costJPY = getCostJPY(h);
+    const pnl = valJPY - costJPY;
+    const pnlPct = costJPY > 0 ? (pnl/costJPY*100) : null;
+    const pc = pnl >= 0 ? 'var(--accent)' : 'var(--danger)';
+    const wd = watchData[h.id] || {};
+    // 目標は % ベース（利確・ロスカット）
+    const tgtUp   = wd.tgtUp   || '';   // 利確 %
+    const tgtDown = wd.tgtDown || '';   // ロスカット %
+    const memo    = wd.memo    || '';
+
+    // 現在の取得からの損益%
+    const nowPct = pnlPct != null ? pnlPct.toFixed(1) : null;
+
+    // 利確・ロスカットまでの残り%
+    let upRemain='', downRemain='';
+    if(tgtUp && nowPct!=null) {
+      const rem = (parseFloat(tgtUp) - parseFloat(nowPct)).toFixed(1);
+      upRemain = `<span style="font-size:10px;color:var(--accent);margin-left:3px">あと+${rem}%</span>`;
+    }
+    if(tgtDown && nowPct!=null) {
+      const rem = (parseFloat(nowPct) - parseFloat(tgtDown)).toFixed(1);
+      downRemain = `<span style="font-size:10px;color:var(--danger);margin-left:3px">あと${rem}%</span>`;
+    }
+
+    const url = chartUrl(h);
+    const chartBtn = url
+      ? `<a href="${url}" target="_blank" rel="noopener" title="チャートを開く"
+           style="text-decoration:none;font-size:13px;padding:2px 5px;border-radius:4px;
+                  background:var(--surface2);border:1px solid var(--border);cursor:pointer;
+                  color:var(--text);transition:background 0.15s;"
+           onmouseover="this.style.background='var(--surface3)'"
+           onmouseout="this.style.background='var(--surface2)'">📈</a>`
+      : '';
+
+    // アラート判定
+    const hitUp   = tgtUp   && nowPct!=null && parseFloat(nowPct) >= parseFloat(tgtUp);
+    const hitDown = tgtDown && nowPct!=null && parseFloat(nowPct) <= parseFloat(tgtDown);
+    const alertBadge = hitUp
+      ? `<span style="background:#4ade80;color:#000;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;animation:pulse 1s infinite">🔔 利確！</span>`
+      : hitDown
+      ? `<span style="background:#f87171;color:#000;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;animation:pulse 1s infinite">🚨 損切！</span>`
+      : '';
+    const rowBg = hitUp ? 'background:rgba(74,222,128,.07)' : hitDown ? 'background:rgba(248,113,113,.07)' : '';
+
+    return `<tr style="${rowBg}">
+      <td>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          ${chartBtn}
+          <div>
+            <div style="font-weight:500;display:flex;align-items:center;gap:5px">
+              ${h.name} ${alertBadge}
+            </div>
+            <div style="font-size:10px;color:var(--text-muted)">${h.broker}${h.ticker?' · '+h.ticker:''}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:3px;font-family:'DM Mono',monospace">
+              <span style="font-size:10px">取得</span> ${h.cost?fmtCost(h.cost):'—'}
+              <span style="color:var(--border);margin:0 3px">→</span>
+              <span style="color:var(--text);font-weight:500">${h.price?fmtCost(parseFloat(h.price)):'—'}</span>
+            </div>
+          </div>
+        </div>
+      </td>
+      <td class="text-right mono jpy-val">${fmtJPY(valJPY)}</td>
+      <td class="text-right mono jpy-val" style="color:${pc}">${pnl!=null?fmtJPY(pnl):'—'}</td>
+      <td class="text-right mono" style="color:${pc};font-size:12px;font-weight:600">${nowPct!=null?(nowPct>=0?'+':'')+nowPct+'%':'—'}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input class="watch-input" type="number" placeholder="利確 %" value="${tgtUp}" style="width:80px"
+            onchange="setWatchField('${h.id}','tgtUp',this.value)"
+            oninput="setWatchField('${h.id}','tgtUp',this.value)">
+          ${upRemain}
+        </div>
+      </td>
+      <td>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input class="watch-input" type="number" placeholder="損切 %" value="${tgtDown}" style="width:80px"
+            onchange="setWatchField('${h.id}','tgtDown',this.value)"
+            oninput="setWatchField('${h.id}','tgtDown',this.value)">
+          ${downRemain}
+        </div>
+      </td>
+      <td>
+        <input class="watch-input watch-memo" type="text" placeholder="メモ..." value="${memo}"
+          onchange="setWatchField('${h.id}','memo',this.value)">
+      </td>
+    </tr>`;
+  }).join('');
+
+  const tableHTML = (items, title) => {
+    if(!items.length) return '';
+    const tVal = items.reduce((s,h)=>s+getValJPY(h),0);
+    const tPnL = items.reduce((s,h)=>s+(getValJPY(h)-getCostJPY(h)),0);
+    const pc = tPnL>=0?'var(--accent)':'var(--danger)';
+    return `<div class="watch-card">
+      <div class="watch-card-header">
+        <span style="font-weight:600">${title} <span style="font-size:11px;color:var(--text-muted);font-weight:400">${items.length}件</span></span>
+        <span style="font-family:'DM Mono',monospace;font-size:13px">
+          ${fmtJPY(tVal)} <span style="color:${pc};font-size:12px">${tPnL>=0?'+':''}${fmtJPY(tPnL)}</span>
+        </span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="watch-table">
+          <thead><tr>
+            <th>銘柄名</th>
+            <th class="text-right">評価額</th>
+            <th class="text-right">損益(円)</th>
+            <th class="text-right">現在損益%</th>
+            <th>📈 利確目標%</th>
+            <th>🛑 損切ライン%</th>
+            <th>メモ</th>
+          </tr></thead>
+          <tbody>${makeRows(items)}</tbody>
+        </table>
+      </div>
+    </div>`;
+  };
+
+  // 待機資金専用テーブル（通貨別まとめ＋比例按分）
+  const cashTableHTML = (items) => {
+    if(!items.length) return '';
+    const totalAll2 = holdings.reduce((s,h)=>s+getValJPY(h), 0);
+    const cashTgtPct = targetAlloc['現金'] || 0;
+    const idealCash = totalAll2 * cashTgtPct / 100;
+
+    // 通貨でグループ化（JPYは全円口座まとめ）
+    const curMap = {};
+    for(const h of items){
+      const cur = (h.currency||'JPY').toUpperCase();
+      if(!curMap[cur]) curMap[cur] = {cur, jpy:0, accounts:[]};
+      curMap[cur].jpy += getValJPY(h);
+      curMap[cur].accounts.push(h.name);
+    }
+    const curList = Object.values(curMap).sort((a,b)=>b.jpy-a.jpy);
+    const totalCash = curList.reduce((s,c)=>s+c.jpy, 0);
+    const excess = totalCash - idealCash;
+
+    // ヘッダーサマリー
+    const summaryBox = cashTgtPct > 0 ? (() => {
+      const exColor = excess >= 0 ? 'var(--accent)' : 'var(--danger)';
+      const exLabel = excess >= 0
+        ? `<b style="color:var(--accent)">${fmtJPY(excess)} 過剰</b>`
+        : `<b style="color:var(--danger)">${fmtJPY(excess)} 不足</b>`;
+      return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px 16px;background:var(--surface2);border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">現在の現金合計</div>
+          <div class="mono jpy-val" style="font-size:16px;font-weight:700">${fmtJPY(totalCash)}</div>
+          <div style="font-size:10px;color:var(--text-muted)">総資産の${totalAll2>0?(totalCash/totalAll2*100).toFixed(1):0}%</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">目標額（総資産の${cashTgtPct}%）</div>
+          <div class="mono" style="font-size:16px;font-weight:700;color:var(--text-muted)">${fmtJPY(idealCash)}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">差額</div>
+          <div style="font-size:15px;font-weight:600">${exLabel}</div>
+          <div style="font-size:10px;color:var(--text-muted)">${excess>=0?'↓ 各通貨の按分を参照':'↑ 資金確保を検討'}</div>
+        </div>
+      </div>`;
+    })() : `<div style="padding:10px 16px;font-size:12px;color:var(--text-muted)">ダッシュボードの「目標を設定」で現金の目標%を設定すると余剰が計算されます</div>`;
+
+    // 通貨別の按分行
+    const curRows = curList.map(c => {
+      const share = totalCash > 0 ? c.jpy / totalCash : 0;
+      // 余剰を現在の通貨比率で按分
+      const myExcess = excess * share;
+      const remain = c.jpy - myExcess; // 目標後に残す額
+      const exColor = myExcess >= 0 ? 'var(--accent)' : 'var(--danger)';
+      const curLabel = c.cur==='JPY'?'🇯🇵 日本円':c.cur==='USD'?'🇺🇸 米ドル':c.cur==='HKD'?'🇭🇰 香港ドル':c.cur;
+      const accountStr = c.accounts.length > 1 ? `（${c.accounts.join('・')}）` : `（${c.accounts[0]}）`;
+
+      return `<tr>
+        <td>
+          <div style="font-weight:600;font-size:13px">${curLabel}</div>
+          <div style="font-size:10px;color:var(--text-muted)">${accountStr}</div>
+        </td>
+        <td class="text-right mono jpy-val" style="font-weight:600">${fmtJPY(c.jpy)}</td>
+        <td class="text-right mono" style="color:var(--text-muted);font-size:12px">${(share*100).toFixed(1)}%</td>
+        <td class="text-right mono" style="color:${exColor};font-weight:600">
+          ${myExcess>=0?'▼ '+fmtJPY(myExcess)+' 投資へ':'▲ '+fmtJPY(Math.abs(myExcess))+' 不足'}
+        </td>
+        <td class="text-right mono" style="color:var(--text-muted)">${fmtJPY(remain)}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="watch-card">
+      <div class="watch-card-header">
+        <span style="font-weight:600">💴 待機資金 <span style="font-size:11px;color:var(--text-muted);font-weight:400">通貨別まとめ</span></span>
+        <span class="mono jpy-val" style="font-size:13px">${fmtJPY(totalCash)}</span>
+      </div>
+      ${summaryBox}
+      <div style="overflow-x:auto">
+        <table class="watch-table">
+          <thead><tr>
+            <th>通貨</th>
+            <th class="text-right">現在残高(円換算)</th>
+            <th class="text-right">現金内比率</th>
+            <th class="text-right">投資へ回す目安</th>
+            <th class="text-right">目標後の残高</th>
+          </tr></thead>
+          <tbody>${curRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  };
+
+  if(!nonCash.length && !cashItems.length) {
+    content.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:40px">🔴短期タグの銘柄がありません<br><span style="font-size:12px">銘柄リストで ⚪ボタンをクリックして 🔴短期 に設定してください</span></div>';
+    return;
+  }
+  content.innerHTML = tableHTML(nonCash, '🔴 短期ポジション') + cashTableHTML(cashItems);
+}
+
+function setWatchField(id, field, value) {
+  if(!watchData[id]) watchData[id] = {};
+  watchData[id][field] = value;
+  saveWatchData();
+}
+
+function save() {
+  localStorage.setItem('portfolio_v6', JSON.stringify(holdings));
+  localStorage.setItem('portfolio_v6_fx', JSON.stringify(fxRates));
+  localStorage.setItem('portfolio_v6_targets', JSON.stringify(targetAlloc));
+  document.getElementById('lastUpdated').textContent = '最終更新: ' + new Date().toLocaleString('ja-JP');
+}
+function load() {
+  // スマホ版エクスポートの埋め込みデータを優先（iOS localStorage制限対策）
+  const pre = window.__PORTFOLIO_PRELOAD__;
+  if (pre) {
+    try { if(pre.holdings)   holdings    = JSON.parse(pre.holdings); } catch(e){ holdings=[]; }
+    try { if(pre.fxRates)    fxRates     = {...fxRates,...JSON.parse(pre.fxRates)}; } catch(e){}
+    try { if(pre.targets)    targetAlloc = JSON.parse(pre.targets); } catch(e){}
+    try { if(pre.watchData)  watchData   = JSON.parse(pre.watchData); } catch(e){}
+    try { if(pre.privacyMode) { privacyMode = pre.privacyMode==='1'; } } catch(e){}
+    return;
+  }
+  // 通常のlocalStorage読み込み
+  try { const d = localStorage.getItem('portfolio_v6'); if(d) holdings = JSON.parse(d); } catch(e){ holdings=[]; }
+  try { const f = localStorage.getItem('portfolio_v6_fx'); if(f) fxRates = {...fxRates,...JSON.parse(f)}; } catch(e){}
+  try { const t = localStorage.getItem('portfolio_v6_targets'); if(t) targetAlloc = JSON.parse(t); } catch(e){}
+  loadWatchData();
+  loadVirtualData();
+}
+function loadSnaps() { try { return JSON.parse(localStorage.getItem('portfolio_v6_snaps')||'[]'); } catch(e){ return []; } }
+function saveSnaps(s) { localStorage.setItem('portfolio_v6_snaps', JSON.stringify(s)); }
+
+// ═══════════════════════════════
+//  Utils
+// ═══════════════════════════════
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
+function fmtNum(n,d=4) { if(!n&&n!==0) return '—'; return Number(n).toLocaleString('ja-JP',{maximumFractionDigits:d}); }
+function fmtCost(n) {
+  if(!n && n!==0) return '—';
+  const v=Number(n);
+  if(v>=1000) return v.toLocaleString('ja-JP',{maximumFractionDigits:0});
+  if(v>=1)    return v.toLocaleString('ja-JP',{maximumFractionDigits:2});
+  return v.toLocaleString('ja-JP',{maximumFractionDigits:4});
+}
+function fmtJPY(n) { if(privacyMode) return '¥ ****'; if(n==null||isNaN(n)) return '¥ —'; return '¥ '+Math.round(n).toLocaleString('ja-JP'); }
+function fmtPct(n) { if(n==null||isNaN(n)) return '—'; return (n>=0?'+':'')+n.toFixed(2)+'%'; }
+
+function toJPY(value, currency) {
+  if(!value||isNaN(value)) return 0;
+  const v = parseFloat(value);
+  if(currency==='JPY') return v;
+  if(currency==='USD' && fxRates.USD) return v*fxRates.USD;
+  if(currency==='HKD' && fxRates.HKD) return v*fxRates.HKD;
+  // 暗号通貨は現在値=円/1コイン → そのまま円
+  if(['BTC','ETH','XRP'].includes(currency)) return v;
+  return v;
+}
+
+function isToushin(h) { return !!(h.isToushin || h.category?.startsWith('投信')); }
+function getVal(h) {
+  let price = parseFloat(h.price)||0;
+  // 暗号通貨で price未取得の場合、fxRates から補完
+  if(!price && h.currency && fxRates[h.currency]) price = fxRates[h.currency];
+  const v = price * (parseFloat(h.qty)||0);
+  return isToushin(h) ? v/10000 : v;
+}
+function getCost(h) {
+  const v = (parseFloat(h.cost)||0)*(parseFloat(h.qty)||0);
+  return isToushin(h) ? v/10000 : v;
+}
+function getValJPY(h) {
+  if(h.category==='現金') return toJPY(parseFloat(h.price)||parseFloat(h.qty)||0, h.currency);
+  return toJPY(getVal(h), h.currency);
+}
+function getCostJPY(h) { return toJPY(getCost(h), h.currency); }
+
+function aggByJPY(key) {
+  const m={};
+  for(const h of holdings){ const k=h[key]||'不明'; m[k]=(m[k]||0)+getValJPY(h); }
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]);
+}
+
+// ═══════════════════════════════
+//  FX Fetch
+// ═══════════════════════════════
+const PROXIES = [
+  u=>u,  // 直接アクセス（CORS許可されていれば最速）
+  u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  u=>`https://thingproxy.freeboard.io/fetch/${u}`,
+];
+
+// タイムアウト付きfetch
+async function fetchWithTimeout(url, opts={}, ms=7000) {
+  const ctrl = new AbortController();
+  const tid = setTimeout(()=>ctrl.abort(), ms);
+  try {
+    return await fetch(url, {...opts, signal:ctrl.signal});
+  } finally { clearTimeout(tid); }
+}
+
+async function yahooFetch(symbol) {
+  const cb = Date.now();
+  const endpoints = [
+    `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d&_=${cb}`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d&_=${cb}`,
+  ];
+  // 全プロキシ×全エンドポイントを並列投げ → 最速成功を採用
+  const attempts = [];
+  for(const ep of endpoints) {
+    for(const mkProxy of PROXIES) {
+      attempts.push(
+        fetchWithTimeout(mkProxy(ep), {headers:{'Accept':'application/json'}}, 7000)
+          .then(res => { if(!res.ok) throw new Error('ng'); return res.json(); })
+          .then(data => {
+            const parsed = typeof data==='string' ? JSON.parse(data) : data;
+            const price = parsed?.chart?.result?.[0]?.meta?.regularMarketPrice;
+            if(price && price>0) return price;
+            throw new Error('no price');
+          })
+      );
+    }
+  }
+  try { return await Promise.any(attempts); } catch(e) { return null; }
+}
+
+// ── CoinGecko（暗号通貨・CORS許可・APIキー不要）──
+async function fetchCoinGecko() {
+  const url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,ripple&vs_currencies=jpy';
+  try {
+    const res = await fetchWithTimeout(url, {headers:{'Accept':'application/json'}}, 10000);
+    if(!res.ok) return null;
+    const d = await res.json();
+    return { BTC: d.bitcoin?.jpy||null, ETH: d.ethereum?.jpy||null, XRP: d.ripple?.jpy||null };
+  } catch(e) { return null; }
+}
+
+// ── Finnhub（米国株・APIキー任意）──
+function getFinnhubKey() { return localStorage.getItem('finnhub_key')||''; }
+function setFinnhubKey(k) {
+  localStorage.setItem('finnhub_key', k.trim());
+  showToast(k.trim() ? '✅ Finnhub APIキーを保存しました' : '🗑️ Finnhubキーを削除しました');
+}
+async function finnhubFetch(symbol) {
+  const key = getFinnhubKey();
+  if(!key) return null;
+  const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${key}`;
+  try {
+    const res = await fetchWithTimeout(url, {headers:{'Accept':'application/json'}}, 7000);
+    if(!res.ok) return null;
+    const d = await res.json();
+    return (d.c && d.c > 0) ? d.c : null;
+  } catch(e) { return null; }
+}
+
+function togglePrivacy() {
+  privacyMode = !privacyMode;
+  document.body.classList.toggle('privacy-mode', privacyMode);
+  document.getElementById('privacyBtn').textContent = privacyMode ? '🙈 金額非表示中' : '👁 金額表示';
+  localStorage.setItem('privacy_mode', privacyMode?'1':'0');
+  renderAll();
+}
+async function fetchAllFX() {
+  const btn = document.getElementById('fxBtn');
+  btn.textContent='⏳ 取得中...'; btn.classList.add('btn-loading');
+  // USD/HKD は Yahoo Finance（並列）
+  const [usd, hkd] = await Promise.all([yahooFetch('JPY=X'), yahooFetch('HKDJPY=X')]);
+  if(usd) fxRates.USD=usd;
+  if(hkd) fxRates.HKD=hkd;
+  // 暗号通貨は CoinGecko 優先 → 失敗時は Yahoo Finance にフォールバック
+  btn.textContent='⏳ 暗号通貨取得中...';
+  let cg = await fetchCoinGecko();
+  if(!cg) {
+    const [btc,eth,xrp] = await Promise.all([
+      yahooFetch('BTC-JPY'), yahooFetch('ETH-JPY'), yahooFetch('XRP-JPY')
+    ]);
+    cg = { BTC:btc, ETH:eth, XRP:xrp };
+  }
+  if(cg.BTC) { fxRates.BTC=cg.BTC; holdings.filter(h=>h.currency==='BTC').forEach(h=>h.price=cg.BTC); }
+  if(cg.ETH) { fxRates.ETH=cg.ETH; holdings.filter(h=>h.currency==='ETH').forEach(h=>h.price=cg.ETH); }
+  if(cg.XRP) { fxRates.XRP=cg.XRP; holdings.filter(h=>h.currency==='XRP').forEach(h=>h.price=cg.XRP); }
+  updateFXDisplay(); save(); renderAll();
+  btn.textContent='🔄 為替更新'; btn.classList.remove('btn-loading');
+  const ok=[usd,hkd,cg.BTC,cg.ETH,cg.XRP].filter(Boolean).length;
+  showToast(ok>0?`✅ レート更新（${ok}/5取得）`:'⚠️ 取得失敗', ok===0);
+  document.getElementById('fxUpdated').textContent='更新: '+new Date().toLocaleTimeString('ja-JP');
+}
+
+function updateFXDisplay() {
+  const show=(id,val,d)=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.textContent=val?val.toFixed(d):'—';
+    el.classList.toggle('fx-stale',!val);
+  };
+  show('fx-usd',fxRates.USD,2); show('fx-hkd',fxRates.HKD,2);
+  show('fx-btc',fxRates.BTC,0); show('fx-eth',fxRates.ETH,0); show('fx-xrp',fxRates.XRP,2);
+}
+
+// ═══════════════════════════════
+//  Price fetch
+// ═══════════════════════════════
+// 通貨・ティッカーからYahoo Finance用シンボルを生成
+function toYahooSymbol(h) {
+  const t = (h.ticker||'').trim();
+  if(!t) return null;
+  const cur = (h.currency||'JPY').toUpperCase();
+  // すでに .T / .HK が付いている場合はそのまま
+  if(t.includes('.')) return t;
+  // 日本株: 数字4桁 → 末尾に .T
+  if(cur==='JPY' && /^\d{4,5}$/.test(t)) return t+'.T';
+  // 香港株: 数字 → 0埋めして .HK
+  if(cur==='HKD' && /^\d+$/.test(t)) return t.padStart(4,'0')+'.HK';
+  // 米国株・その他: そのまま
+  return t;
+}
+
+// 株価取得結果モーダル
+function showFetchResultModal(successList, failList) {
+  // 既存モーダルがあれば削除
+  const existing = document.getElementById('fetchResultModal');
+  if(existing) existing.remove();
+
+  const successHTML = successList.length === 0 ? '' :
+    `<div style="margin-bottom:12px">
+      <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:6px">✅ 取得成功 ${successList.length}件</div>
+      <div style="max-height:200px;overflow-y:auto;background:var(--surface2);border-radius:6px;padding:8px">
+        ${successList.map(r=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--border);font-size:12px">
+            <span style="color:var(--text)">${r.name}</span>
+            <span class="mono" style="color:var(--accent);font-weight:600">¥ ${r.price.toLocaleString('ja-JP',{maximumFractionDigits:2})}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  const failHTML = failList.length === 0 ? '' :
+    `<div style="margin-bottom:12px">
+      <div style="font-size:12px;font-weight:600;color:var(--danger);margin-bottom:6px">❌ 取得失敗 ${failList.length}件</div>
+      <div style="max-height:160px;overflow-y:auto;background:var(--surface2);border-radius:6px;padding:8px">
+        ${failList.map(r=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--border);font-size:12px">
+            <span style="color:var(--text)">${r.name}</span>
+            <span class="mono" style="color:var(--text-muted)">${r.sym||'ティッカーなし'}</span>
+          </div>`).join('')}
+      </div>
+      ${failList.filter(r=>r.sym).length > 0 ? `
+      <button onclick="retryFailedFetch(window._lastFailList)" 
+        style="margin-top:8px;width:100%;padding:7px;background:var(--danger);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">
+        🔄 失敗した${failList.filter(r=>r.sym).length}件を再取得
+      </button>` : ''}
+    </div>`;
+
+  const modal = document.createElement('div');
+  modal.id = 'fetchResultModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:12px;padding:20px;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.5)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <span style="font-weight:700;font-size:14px">📡 株価取得結果</span>
+        <button onclick="document.getElementById('fetchResultModal').remove()" 
+          style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;line-height:1">×</button>
+      </div>
+      ${successHTML}
+      ${failHTML}
+      <button onclick="document.getElementById('fetchResultModal').remove()"
+        style="width:100%;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;color:var(--text)">
+        閉じる
+      </button>
+    </div>`;
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+  document.body.appendChild(modal);
+  window._lastFailList = failList;
+}
+
+// 失敗分のみ再取得
+async function retryFailedFetch(failList) {
+  document.getElementById('fetchResultModal')?.remove();
+  const targets = failList.filter(r=>r.sym).map(r=>r.h);
+  if(!targets.length) return;
+  await fetchPricesBatch(targets, null, null);
+}
+
+// 並列バッチ取得（BATCH_SIZE件ずつ同時実行）
+async function fetchPricesBatch(targets, btnId, label) {
+  const BATCH_SIZE = 6;
+  const btn = btnId ? document.getElementById(btnId) : null;
+  if(btn){ btn.textContent='⏳ 更新中...'; btn.classList.add('btn-loading'); }
+  const successList = [];
+  const failList = [];
+  for(let i=0; i<targets.length; i+=BATCH_SIZE){
+    const batch = targets.slice(i, i+BATCH_SIZE);
+    if(btn) btn.textContent=`⏳ ${i}/${targets.length}件...`;
+    await Promise.all(batch.map(async h=>{
+      const sym=toYahooSymbol(h);
+      if(!sym){ failList.push({name:h.name, sym:null, h}); return; }
+      // 米国株かつFinnhubキー設定済み → Finnhub優先
+      const cur=(h.currency||'').toUpperCase();
+      const isUS = cur==='USD' && !/^\d/.test(sym);
+      let p = null;
+      if(isUS && getFinnhubKey()) p = await finnhubFetch(sym);
+      if(p===null) p = await yahooFetch(sym);
+      if(p!==null){
+        h.price=p;
+        successList.push({name:h.name, sym, price:p});
+      } else {
+        failList.push({name:h.name, sym, h});
+      }
+    }));
+  }
+  save(); renderAll();
+  if(btn && label){ btn.textContent=label; btn.classList.remove('btn-loading'); }
+  // 結果モーダル表示
+  showFetchResultModal(successList, failList);
+}
+
+async function fetchAllPrices(unacquiredOnly=false) {
+  let wt = holdings.filter(h=>h.ticker);
+  if(unacquiredOnly) wt = wt.filter(h=>!h.price || h.price<=0);
+  if(!wt.length){ showToast(unacquiredOnly?'✅ 未取得銘柄はありません':'⚠️ ティッカー登録済み銘柄がありません',!unacquiredOnly); return; }
+  await fetchPricesBatch(wt, 'priceBtn', '📡 株価一括更新');
+}
+
+async function fetchShortPrices(unacquiredOnly=false) {
+  let wt = holdings.filter(h=>h.ticker && h.horizon==='short');
+  if(unacquiredOnly) wt = wt.filter(h=>!h.price || h.price<=0);
+  if(!wt.length){ showToast('⚠️ 🔴短期タグ＋ティッカー登録済み銘柄がありません',true); return; }
+  await fetchPricesBatch(wt, 'shortPriceBtn', '🔴 短期のみ更新');
+}
+async function fetchShortPricesWatch(unacquiredOnly=false) {
+  let wt = holdings.filter(h=>h.ticker && h.horizon==='short');
+  if(unacquiredOnly) wt = wt.filter(h=>!h.price || h.price<=0);
+  if(!wt.length){ showToast(unacquiredOnly?'✅ 未取得の短期銘柄はありません（全件取得済み）':'⚠️ ティッカー登録済みの🔴短期銘柄がありません',!unacquiredOnly); return; }
+  await fetchPricesBatch(wt, 'shortPriceBtn2', '🔴 株価更新');
+}
+
+// ═══════════════════════════════
+//  Donut chart
+// ═══════════════════════════════
+function drawDonut(canvasId, data) {
+  const canvas=document.getElementById(canvasId);
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const total=data.reduce((s,d)=>s+d.value,0);
+  const cx=W/2,cy=H/2,r=74,inner=48;
+  if(!total){
+    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fillStyle='#2a2f3e';ctx.fill();
+    ctx.beginPath();ctx.arc(cx,cy,inner,0,Math.PI*2);ctx.fillStyle='#161921';ctx.fill();
+    return;
+  }
+  let angle=-Math.PI/2;
+  data.forEach((d,i)=>{
+    const slice=(d.value/total)*Math.PI*2;
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,angle,angle+slice);ctx.closePath();
+    ctx.fillStyle=COLORS[i%COLORS.length];ctx.fill();
+    angle+=slice;
+  });
+  ctx.beginPath();ctx.arc(cx,cy,inner,0,Math.PI*2);ctx.fillStyle='#161921';ctx.fill();
+  ctx.fillStyle='#e8eaf0';ctx.font='bold 10px DM Mono,monospace';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(data.length+'項目',cx,cy);
+}
+
+function renderLegend(id, data) {
+  const total=data.reduce((s,d)=>s+d.value,0);
+  const items=data.slice(0,8).map((d,i)=>{
+    const pct=total>0?((d.value/total)*100).toFixed(1):'0.0';
+    return `<div class="legend-item">
+      <div class="legend-dot" style="background:${COLORS[i%COLORS.length]}"></div>
+      <div class="legend-name">${d.label}</div>
+      <div class="legend-val">${pct}% <span style="color:var(--text-muted);font-size:10px">(${fmtJPY(d.value)})</span></div>
+    </div>`;
+  }).join('');
+  const tot=`<div class="legend-total"><span>合計</span><span>${fmtJPY(total)}</span></div>`;
+  document.getElementById(id).innerHTML=items+tot;
+}
+
+// ═══════════════════════════════
+//  Summary
+// ═══════════════════════════════
+function renderSummary() {
+  const totalJPY=holdings.reduce((s,h)=>s+getValJPY(h),0);
+  const cashJPY=holdings.filter(h=>h.category==='現金').reduce((s,h)=>s+getValJPY(h),0);
+  const investJPY=totalJPY-cashJPY;
+  const totalCostJPY=holdings.reduce((s,h)=>s+getCostJPY(h),0);
+  const pnl=totalJPY-totalCostJPY;
+  const pnlPct=totalCostJPY>0?(pnl/totalCostJPY)*100:null;
+  const nisa=holdings.filter(h=>h.nisa);
+  const nisaJPY=nisa.reduce((s,h)=>s+getValJPY(h),0);
+  const brokers=new Set(holdings.map(h=>h.broker)).size;
+  const cashPct=totalJPY>0?(cashJPY/totalJPY*100).toFixed(1):0;
+
+  document.getElementById('totalJPY').textContent=fmtJPY(totalJPY);
+  document.getElementById('totalCount').textContent=holdings.length+'件（現金含む）';
+  document.getElementById('investJPY').textContent=fmtJPY(investJPY);
+  document.getElementById('cashPct').textContent=`現金 ${fmtJPY(cashJPY)} (${cashPct}%)`;
+  document.getElementById('totalNISA').textContent=fmtJPY(nisaJPY);
+  document.getElementById('nisaCount').textContent=nisa.length+'銘柄';
+  document.getElementById('brokerCount').textContent=brokers||'—';
+  const pnlEl=document.getElementById('totalPnL');
+  pnlEl.textContent=fmtJPY(pnl);
+  pnlEl.style.color=pnl>=0?'var(--accent)':'var(--danger)';
+  document.getElementById('totalPnLPct').textContent=fmtPct(pnlPct);
+}
+
+// ═══════════════════════════════
+//  Charts & Agg tables
+// ═══════════════════════════════
+function renderCharts() {
+  const mk=key=>aggByJPY(key).map((e,i)=>({label:e[0],value:e[1]}));
+  ['catChart','brokerChart','currencyChart'].forEach((id,i)=>{
+    const data=mk(['category','broker','currency'][i]);
+    drawDonut(id,data);
+    renderLegend(['catLegend','brokerLegend','currencyLegend'][i],data);
+  });
+}
+
+function renderAggTables() {
+  const render=(tid,data)=>{
+    const total=data.reduce((s,d)=>s+d[1],0);
+    document.querySelector('#'+tid+' tbody').innerHTML=data.map(([k,v])=>`
+      <tr><td>${k}</td>
+      <td class="text-right mono">${fmtJPY(v)}</td>
+      <td class="text-right mono text-accent">${total>0?((v/total)*100).toFixed(1):0}%</td></tr>`
+    ).join('')||'<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:14px">データなし</td></tr>';
+  };
+  render('brokerAggTable',aggByJPY('broker'));
+  render('currencyAggTable',aggByJPY('currency'));
+}
+
+// ═══════════════════════════════
+//  Target allocation
+// ═══════════════════════════════
+function renderTargetBars() {
+  const container=document.getElementById('targetBars');
+  if(!Object.keys(targetAlloc).length){
+    container.innerHTML='<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px">目標配分が未設定です。右上の「目標を設定」から入力してください。</div>';
+    return;
+  }
+  const totalJPY=holdings.reduce((s,h)=>s+getValJPY(h),0);
+  const catMap=Object.fromEntries(aggByJPY('category'));
+  container.innerHTML=Object.entries(targetAlloc).map(([cat,tgt])=>{
+    const cur=totalJPY>0?((catMap[cat]||0)/totalJPY*100):0;
+    const diff=cur-tgt;
+    const diffColor=Math.abs(diff)<2?'var(--text-muted)':diff>0?'var(--warn)':'var(--accent2)';
+    const ci=CATEGORIES.indexOf(cat);
+    const color=COLORS[ci>=0?ci:0];
+    return `<div class="target-bar-row">
+      <div class="target-label">${cat}</div>
+      <div class="target-track">
+        <div class="target-fill" style="width:${Math.min(cur,100)}%;background:${color}"></div>
+        <div class="target-marker" style="left:${Math.min(tgt,100)}%"></div>
+      </div>
+      <div class="target-pct" style="color:${color}">${cur.toFixed(1)}%</div>
+      <div class="target-diff" style="color:${diffColor}">${diff>=0?'+':''}${diff.toFixed(1)}%</div>
+    </div>`;
+  }).join('');
+  // Legend
+  container.innerHTML+='<div style="font-size:11px;color:var(--text-muted);margin-top:10px">● 塗り：現在値　| オレンジ縦線：目標値　| 右数値：現在−目標</div>';
+}
+
+function openTargetModal() {
+  const inputs=CATEGORIES.map(cat=>`
+    <div class="target-input-row">
+      <label style="font-size:13px">${cat}</label>
+      <input class="form-input" type="number" min="0" max="100" step="1"
+        id="tgt-${cat}" value="${targetAlloc[cat]||''}" placeholder="0" style="width:80px;text-align:right">
+    </div>`).join('');
+  document.getElementById('targetInputs').innerHTML=inputs;
+  document.getElementById('targetModalOverlay').classList.add('open');
+}
+function closeTargetModal(){ document.getElementById('targetModalOverlay').classList.remove('open'); }
+function saveTargets(){
+  targetAlloc={};
+  CATEGORIES.forEach(cat=>{
+    const v=parseFloat(document.getElementById('tgt-'+cat)?.value||0);
+    if(v>0) targetAlloc[cat]=v;
+  });
+  save(); renderTargetBars(); closeTargetModal();
+  showToast('✅ 目標配分を保存しました');
+}
+
+// ═══════════════════════════════
+//  PnL Ranking
+// ═══════════════════════════════
+function renderRanking() {
+  const ranked=holdings
+    .filter(h=>h.category!=='現金')
+    .map(h=>({name:h.name,pnl:getValJPY(h)-getCostJPY(h)}))
+    .filter(h=>!isNaN(h.pnl)&&h.pnl!==0)
+    .sort((a,b)=>b.pnl-a.pnl);
+
+  const makeList=(items,color)=>items.length
+    ?items.map((h,i)=>`<div class="rank-item">
+        <div class="rank-num">${i+1}</div>
+        <div class="rank-name">${h.name}</div>
+        <div class="rank-val" style="color:${color}">${fmtJPY(h.pnl)}</div>
+      </div>`).join('')
+    :'<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px">データなし</div>';
+
+  document.getElementById('gainRanking').innerHTML=makeList(ranked.slice(0,5),'var(--accent)');
+  document.getElementById('lossRanking').innerHTML=makeList([...ranked].reverse().slice(0,5).filter(h=>h.pnl<0),'var(--danger)');
+}
+
+// ═══════════════════════════════
+//  Broker accordion
+// ═══════════════════════════════
+function renderBrokerGroups() {
+  const q=document.getElementById('searchInput').value.toLowerCase();
+  const container=document.getElementById('brokerAccordion');
+  const emptyState=document.getElementById('emptyState');
+
+  if(!holdings.length){ container.innerHTML=''; emptyState.style.display='block'; return; }
+  emptyState.style.display='none';
+
+  const groups={};
+  for(const h of holdings){
+    if(q&&!(h.name+h.broker+(h.ticker||'')+(h.memo||'')).toLowerCase().includes(q)) continue;
+    if(horizonFilter!=='all'&&(h.horizon||'')!==horizonFilter) continue;
+    const k=h.broker||'未設定';
+    if(!groups[k]) groups[k]=[];
+    groups[k].push(h);
+  }
+
+  const brokerKeys=Object.keys(groups);
+  if(!brokerKeys.length){ container.innerHTML='<div style="color:var(--text-muted);text-align:center;padding:16px">該当なし</div>'; return; }
+
+  const totalAll=holdings.reduce((s,h)=>s+getValJPY(h),0);
+
+  container.innerHTML=brokerKeys.map((broker,bi)=>{
+    const items=groups[broker];
+    const btotal=items.reduce((s,h)=>s+getValJPY(h),0);
+    const isOpen=openBrokers.has(broker)||(openBrokers.size===0&&bi===0);
+    if(isOpen) openBrokers.add(broker);
+    const color=COLORS[bi%COLORS.length];
+
+    const rows=items.map(h=>{
+      const isCash=h.category==='現金';
+      const valJPY=getValJPY(h);
+      const costJPY=getCostJPY(h);
+      const pnl=isCash?null:valJPY-costJPY;
+      const pnlPct=(!isCash&&costJPY>0)?(pnl/costJPY*100):null;
+      const pc=pnl>=0?'var(--accent)':'var(--danger)';
+      const horizonEmoji = h.horizon==='long'?'🟢':h.horizon==='mid'?'🟡':h.horizon==='short'?'🔴':'⚪';
+      const horizonClass = h.horizon==='long'?'h-long':h.horizon==='mid'?'h-mid':h.horizon==='short'?'h-short':'';
+      return `<tr class="${horizonClass}">
+        <td>
+          <button class="horizon-btn" onclick="cycleHorizon('${h.id}')" title="時間軸: ${h.horizon==='long'?'長期':h.horizon==='mid'?'中期':h.horizon==='short'?'短期':'未設定'} → クリックで変更">${horizonEmoji}</button>
+          <span style="font-weight:500">${h.name||'—'}</span>
+          ${h.ticker?`<span class="ticker-badge">${h.ticker}</span>`:''}
+          ${isCash?'<span class="cash-badge">現金</span>':''}
+          ${h.memo?`<span style="font-size:10px;color:var(--text-muted);margin-left:4px">${h.memo}</span>`:''}
+        </td>
+        <td class="text-muted-c" style="font-size:11px">${h.category||'—'}</td>
+        <td class="text-right mono">${isCash?'—':fmtNum(h.qty)}</td>
+        <td class="text-right mono">${isCash?'—':(h.cost?fmtCost(h.cost):'—')}</td>
+        <td class="text-right mono">${isCash?'—':((h.price||(fxRates[h.currency]||0))?fmtNum(h.price||(fxRates[h.currency]||0)):'—')}</td>
+        <td class="text-right mono text-accent jpy-val">${fmtJPY(valJPY)}</td>
+        <td class="text-right mono jpy-val" style="color:${pnl!=null?pc:'var(--text-muted)'}">${pnl!=null?fmtJPY(pnl):'—'}</td>
+        <td class="text-right mono" style="color:${pnl!=null?pc:'var(--text-muted)'};font-size:11px">${fmtPct(pnlPct)}</td>
+        <td style="font-size:11px">${h.currency||'—'}</td>
+        <td>${h.nisa?'<span class="nisa-badge">NISA</span>':''}</td>
+        <td>
+          <button class="btn btn-ghost" onclick="editHolding('${h.id}')" style="font-size:11px;padding:3px 8px;margin-right:2px">編集</button>
+          <button class="btn btn-danger" onclick="deleteHolding('${h.id}')">削除</button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="broker-group${isOpen?' open':''}" data-broker="${broker}">
+      <div class="broker-header" onclick="toggleBroker('${broker}')">
+        <div class="broker-header-left">
+          <div class="broker-dot" style="background:${color}"></div>
+          <div class="broker-name">${broker}</div>
+          <div class="broker-count">${items.length}件</div>
+        </div>
+        <div class="broker-header-right">
+          <div class="broker-total">${fmtJPY(btotal)}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-muted)">${totalAll>0?((btotal/totalAll)*100).toFixed(1):0}%</div>
+          <div class="broker-chevron">▼</div>
+        </div>
+      </div>
+      <div class="broker-body">
+        <table><thead><tr>
+          <th>銘柄名</th><th>分類</th>
+          <th class="text-right">数量</th><th class="text-right">取得単価</th>
+          <th class="text-right">現在値</th><th class="text-right">評価額(円)</th>
+          <th class="text-right">損益(円)</th><th class="text-right">損益率</th>
+          <th>通貨</th><th>NISA</th><th></th>
+        </tr></thead>
+        <tbody>${rows}</tbody></table>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function cycleHorizon(id) {
+  const h=holdings.find(x=>x.id===id);
+  if(!h) return;
+  const cycle={undefined:'long', '':'long', long:'mid', mid:'short', short:''};
+  h.horizon=cycle[h.horizon]||'';
+  save(); renderBrokerGroups();
+}
+
+function setHorizonFilter(val, btn) {
+  horizonFilter=val;
+  document.querySelectorAll('.horizon-filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderBrokerGroups();
+}
+
+function toggleBroker(broker) {
+  if(openBrokers.has(broker)) openBrokers.delete(broker); else openBrokers.add(broker);
+  const el=document.querySelector('.broker-group[data-broker="'+broker.replace(/"/g,'\\"')+'"]');
+  if(el) el.classList.toggle('open',openBrokers.has(broker));
+}
+
+// ═══════════════════════════════
+//  Modal
+// ═══════════════════════════════
+function onCategoryChange() {
+  const cat=document.getElementById('f-category').value;
+  const isCash=cat==='現金';
+  document.getElementById('tickerGroup').style.display=isCash?'none':'';
+  document.getElementById('costGroup').style.display=isCash?'none':'';
+  document.getElementById('qtyLabel').textContent=isCash?'（金額）':'（口数・株数）';
+  document.getElementById('priceLabel').innerHTML=isCash?'残高 <span>（通貨建て・数量×現在値）</span>':'現在値 <span>（通貨建て）</span>';
+  updateCalc();
+}
+
+function updateCalc() {
+  const qty=parseFloat(document.getElementById('f-qty').value)||0;
+  const price=parseFloat(document.getElementById('f-price').value)||0;
+  const cost=parseFloat(document.getElementById('f-cost').value)||0;
+  const currency=document.getElementById('f-currency').value;
+  const isCash=document.getElementById('f-category').value==='現金';
+
+  let text='';
+  if(isCash){
+    const valJPY=toJPY(qty,currency);
+    text=`残高: ${fmtJPY(valJPY)}`;
+  } else if(qty&&price){
+    const _isToushin = document.getElementById('f-category').value.startsWith('投信');
+    const valNative=_isToushin ? qty*price/10000 : qty*price;
+    const valJPY=toJPY(valNative,currency);
+    text=`評価額: ${fmtNum(valNative)} ${currency}`;
+    if(_isToushin) text+=' (口数×基準価額÷10000)';
+    if(currency!=='JPY') text+=` ≈ ${fmtJPY(valJPY)}`;
+    if(cost){
+      const costJPY=toJPY(_isToushin ? qty*cost/10000 : qty*cost, currency);
+      const pnl=valJPY-costJPY;
+      const pnlPct=costJPY>0?(pnl/costJPY*100):0;
+      text+=`\n損益: ${pnl>=0?'+':''}${fmtJPY(pnl)} (${pnl>=0?'+':''}${pnlPct.toFixed(2)}%)`;
+    }
+  } else {
+    text='数量と現在値を入力すると自動計算されます';
+  }
+  document.getElementById('calcPreview').textContent=text;
+}
+
+function openModal(id) {
+  editingId=id||null;
+  const h=id?holdings.find(x=>x.id===id):null;
+  document.getElementById('modalTitle').textContent=id?'銘柄を編集':'銘柄を追加';
+  document.getElementById('f-broker').value=h?.broker||'';
+  document.getElementById('f-name').value=h?.name||'';
+  document.getElementById('f-category').value=h?.category||'';
+  document.getElementById('f-currency').value=h?.currency||'JPY';
+  document.getElementById('f-ticker').value=h?.ticker||'';
+  document.getElementById('f-qty').value=h?.qty||'';
+  document.getElementById('f-cost').value=h?.cost||'';
+  document.getElementById('f-price').value=h?.price||'';
+  document.getElementById('f-memo').value=h?.memo||'';
+  document.getElementById('f-nisa').checked=h?.nisa||false;
+  onCategoryChange(); updateCalc();
+  document.getElementById('modalOverlay').classList.add('open');
+  setTimeout(()=>document.getElementById('f-broker').focus(),80);
+}
+function closeModal(){ document.getElementById('modalOverlay').classList.remove('open'); editingId=null; }
+
+function saveHolding() {
+  const broker=document.getElementById('f-broker').value.trim();
+  const name=document.getElementById('f-name').value.trim();
+  const category=document.getElementById('f-category').value;
+  if(!broker){ alert('証券会社を選択してください'); return; }
+  if(!name){ alert('銘柄名を入力してください'); return; }
+  if(!category){ alert('資産分類を選択してください'); return; }
+  const h={
+    id:editingId||uid(), broker, name, category,
+    currency:document.getElementById('f-currency').value,
+    ticker:document.getElementById('f-ticker').value.trim().toUpperCase(),
+    qty:document.getElementById('f-qty').value,
+    cost:document.getElementById('f-cost').value,
+    price:document.getElementById('f-price').value,
+    memo:document.getElementById('f-memo').value.trim(),
+    nisa:document.getElementById('f-nisa').checked,
+    updatedAt:new Date().toISOString()
+  };
+  if(editingId){ const idx=holdings.findIndex(x=>x.id===editingId); if(idx>=0) holdings[idx]=h; }
+  else holdings.push(h);
+  save(); closeModal(); renderAll();
+  showToast(editingId?'✅ 更新しました':'✅ 追加しました');
+}
+function editHolding(id){ openModal(id); }
+function deleteHolding(id){
+  if(!confirm('削除しますか？')) return;
+  holdings=holdings.filter(h=>h.id!==id);
+  save(); renderAll(); showToast('🗑️ 削除しました');
+}
+
+// ═══════════════════════════════
+//  Snapshots
+// ═══════════════════════════════
+function takeSnapshot() {
+  const totalJPY=holdings.reduce((s,h)=>s+getValJPY(h),0);
+  const cashJPY=holdings.filter(h=>h.category==='現金').reduce((s,h)=>s+getValJPY(h),0);
+  const nisaJPY=holdings.filter(h=>h.nisa).reduce((s,h)=>s+getValJPY(h),0);
+  const today=new Date();
+  const dateStr=today.toISOString().slice(0,10);
+  const weekNum=Math.ceil(today.getDate()/7);
+  const weekLabel=today.getFullYear()+'年'+(today.getMonth()+1)+'月 第'+weekNum+'週';
+  const snap={
+    date:dateStr, label:weekLabel,
+    totalJPY:Math.round(totalJPY), cashJPY:Math.round(cashJPY),
+    nisaJPY:Math.round(nisaJPY), count:holdings.length,
+    categories:Object.fromEntries(aggByJPY('category').map(([k,v])=>[k,Math.round(v)])),
+  };
+  const snaps=loadSnaps();
+  const idx=snaps.findIndex(s=>s.date===dateStr);
+  if(idx>=0) snaps[idx]=snap; else snaps.push(snap);
+  snaps.sort((a,b)=>a.date.localeCompare(b.date));
+  saveSnaps(snaps);
+  showToast('📈 推移グラフを更新しました（'+weekLabel+'）');
+  // タブ切り替えしてからrenderHistoryTab
+  switchTab('history');
+}
+
+function clearSnapshots(){
+  if(!confirm('推移履歴をすべて削除しますか？')) return;
+  localStorage.removeItem('portfolio_v6_snaps');
+  renderHistoryTab();
+  showToast('🗑️ 履歴を削除しました');
+}
+
+// ═══════════════════════════════
+//  History tab
+// ═══════════════════════════════
+function renderHistoryTab() {
+  const snaps=loadSnaps();
+  const noMsg=document.getElementById('noSnapsMsg');
+  const canvas=document.getElementById('historyChart');
+  const tbody=document.getElementById('snapTableBody');
+  const bdGrid=document.getElementById('breakdownGrid');
+
+  // 内訳グラフ（常に現在データで描画）
+  renderBreakdownCharts(bdGrid);
+
+  if(!snaps.length){
+    noMsg.style.display='block'; canvas.style.display='none';
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:16px">記録なし</td></tr>';
+    return;
+  }
+  noMsg.style.display='none'; canvas.style.display='block';
+
+  // Line chart
+  const W=Math.max(canvas.parentElement.clientWidth-48, 300);
+  const H=300;
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  const PAD={top:20,right:20,bottom:52,left:82};
+  const CW=W-PAD.left-PAD.right, CH=H-PAD.top-PAD.bottom;
+  const vals=snaps.map(s=>s.totalJPY);
+  const minV=Math.min(...vals)*0.94, maxV=Math.max(...vals)*1.06;
+  const range=maxV-minV||1;
+  const toX=i=>PAD.left+(i/(snaps.length-1||1))*CW;
+  const toY=v=>PAD.top+CH-((v-minV)/range)*CH;
+
+  // Grid
+  ctx.strokeStyle='#2a2f3e'; ctx.lineWidth=1;
+  for(let t=0;t<=5;t++){
+    const y=PAD.top+(t/5)*CH;
+    ctx.beginPath();ctx.moveTo(PAD.left,y);ctx.lineTo(PAD.left+CW,y);ctx.stroke();
+    const val=maxV-(t/5)*range;
+    ctx.fillStyle='#6b7185';ctx.font='10px DM Mono,monospace';ctx.textAlign='right';
+    ctx.fillText(privacyMode?'****万':'¥'+Math.round(val/10000).toLocaleString()+'万',PAD.left-5,y+4);
+  }
+
+  // Area
+  ctx.beginPath();ctx.moveTo(toX(0),toY(vals[0]));
+  snaps.forEach((s,i)=>ctx.lineTo(toX(i),toY(s.totalJPY)));
+  ctx.lineTo(toX(snaps.length-1),PAD.top+CH);ctx.lineTo(toX(0),PAD.top+CH);ctx.closePath();
+  const grad=ctx.createLinearGradient(0,PAD.top,0,PAD.top+CH);
+  grad.addColorStop(0,'rgba(74,222,154,0.22)');grad.addColorStop(1,'rgba(74,222,154,0.01)');
+  ctx.fillStyle=grad;ctx.fill();
+
+  // Line
+  ctx.beginPath();ctx.moveTo(toX(0),toY(vals[0]));
+  snaps.forEach((s,i)=>ctx.lineTo(toX(i),toY(s.totalJPY)));
+  ctx.strokeStyle='#4ade9a';ctx.lineWidth=2.5;ctx.stroke();
+
+  // Dots
+  snaps.forEach((s,i)=>{
+    const x=toX(i),y=toY(s.totalJPY);
+    ctx.beginPath();ctx.arc(x,y,4.5,0,Math.PI*2);
+    ctx.fillStyle='#4ade9a';ctx.fill();ctx.strokeStyle='#161921';ctx.lineWidth=2;ctx.stroke();
+    ctx.fillStyle='#6b7185';ctx.font='9px Noto Sans JP,sans-serif';ctx.textAlign='center';
+    ctx.fillText(s.label||s.date,x,H-PAD.bottom+16);
+  });
+
+  // Table
+  tbody.innerHTML=snaps.slice().reverse().map((s,ri,arr)=>{
+    const prev=arr[ri+1];
+    const diff=prev?s.totalJPY-prev.totalJPY:null;
+    const diffPct=prev&&prev.totalJPY>0?((diff/prev.totalJPY)*100).toFixed(2):null;
+    const dc=diff!==null?(diff>=0?'var(--accent)':'var(--danger)'):'var(--text-muted)';
+    const sg=diff>=0?'+':'';
+    const cashPct=s.totalJPY>0?((s.cashJPY||0)/s.totalJPY*100).toFixed(1):'0.0';
+    return `<tr>
+      <td class="mono">${s.date}</td>
+      <td style="font-size:11px;color:var(--text-muted)">${s.label||'—'}</td>
+      <td class="text-right mono text-accent">${fmtJPY(s.totalJPY)}</td>
+      <td class="text-right mono" style="color:${dc}">${diff!==null?sg+fmtJPY(diff)+' ('+sg+diffPct+'%)':'—'}</td>
+      <td class="text-right mono" style="color:var(--accent2)">${cashPct}%</td>
+      <td class="text-right mono" style="color:var(--nisa)">${fmtJPY(s.nisaJPY)}</td>
+      <td class="text-right mono">${s.count}件</td>
+      <td><button class="btn btn-danger" onclick="deleteSnapshot('${s.date}')">削除</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// 資産分類ごとの内訳ドーナツ
+function renderBreakdownCharts(container) {
+  const totalJPY=holdings.reduce((s,h)=>s+getValJPY(h),0);
+  const catMap={};
+  for(const h of holdings){
+    const cat=h.category||'その他';
+    if(!catMap[cat]) catMap[cat]=[];
+    catMap[cat].push(h);
+  }
+  if(!Object.keys(catMap).length){ container.innerHTML=''; return; }
+
+  container.innerHTML=Object.entries(catMap).map(([cat,items],ci)=>{
+    const catTotal=items.reduce((s,h)=>s+getValJPY(h),0);
+    const catPct=totalJPY>0?((catTotal/totalJPY)*100).toFixed(1):'0.0';
+    const cid='bd-'+ci;
+    const legendId='bdl-'+ci;
+    return `<div class="chart-card">
+      <div class="chart-title">${cat} <span style="color:var(--text-muted);font-weight:400">${catPct}% / ${fmtJPY(catTotal)}</span></div>
+      <canvas id="${cid}" width="150" height="150"></canvas>
+      <div class="legend" id="${legendId}"></div>
+    </div>`;
+  }).join('');
+
+  // 描画はDOMが更新された後
+  requestAnimationFrame(()=>{
+    Object.entries(catMap).forEach(([cat,items],ci)=>{
+      const data=items.map(h=>({label:h.name,value:getValJPY(h)})).sort((a,b)=>b.value-a.value);
+      drawDonut('bd-'+ci, data);
+      renderLegend('bdl-'+ci, data);
+    });
+  });
+}
+
+function deleteSnapshot(date){
+  if(!confirm(date+' を削除しますか？')) return;
+  saveSnaps(loadSnaps().filter(s=>s.date!==date));
+  renderHistoryTab();
+}
+
+// ═══════════════════════════════
+//  Tab switching
+// ═══════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab-page').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el=>el.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelector(`.tab-btn[onclick="switchTab('${name}')"]`).classList.add('active');
+  localStorage.setItem('portfolio_v6_tab', name);
+  if(name==='history') {
+    requestAnimationFrame(()=>requestAnimationFrame(()=>renderHistoryTab()));
+  }
+  if(name==='watch') {
+    renderWatchTab();
+  }
+}
+
+// ═══════════════════════════════
+//  CSV Import (Phase 2)
+// ═══════════════════════════════
+let importedRows = [];
+let importBrokerName = '';
+let privacyMode = false;
+let horizonFilter = 'all';
+
+const BROKER_FORMAT_HINTS = {
+  rakuten: `<b style="color:var(--accent2)">楽天証券</b>：保有商品一覧（すべて）→「CSVで保存」<br>ファイル名: <span style="font-family:'DM Mono',monospace">assetbalance(all)_YYYYMMDD_HHmmss.csv</span><br>文字コード: Shift-JIS（自動変換）`,
+  sbi: `<b style="color:var(--accent2)">SBI証券</b>：ポートフォリオ →「CSVダウンロード」<br>ファイル名: <span style="font-family:'DM Mono',monospace">SaveFile.csv</span><br>文字コード: Shift-JIS（自動変換）`,
+  nomura: `<b style="color:var(--accent2)">野村證券</b>：口座情報 → 残高・保有証券 →「ダウンロード」<br>文字コード: UTF-8 BOM（自動変換）`,
+  mitsubishi: `<b style="color:var(--accent2)">三菱eスマート証券</b>：口座管理 → 保有銘柄 → CSV出力<br>フォーマット: 汎用CSVとして読み込みます`,
+  paypay: `<b style="color:var(--accent2)">PayPay証券</b>：汎用CSVとして読み込みます`,
+  'nomura-持株': `<b style="color:var(--accent2)">野村持株会</b>：汎用CSVとして読み込みます`,
+  coincheck: `<b style="color:var(--accent2)">コインチェック</b>：取引履歴CSV（様式1）を読み込みます<br>📥 左サイドバー（人型アイコン）→ <b>取引履歴</b> → CSVダウンロード<br><b>複数年分を同時選択可</b>（Ctrl/Cmd+クリック）`,
+  gmo: `<b style="color:var(--accent2)">GMOコイン</b>：取引レポートCSVを読み込みます<br>📥 左サイドバー → <b>明細</b> → CSVダウンロード<br><b>複数年分を同時選択可</b>（Ctrl/Cmd+クリック）`,
+  'nomura-kabu': `<b style="color:var(--accent2)">野村持株会</b>：残高照会ページをCtrl+A→Ctrl+Cでコピーして貼り付けてください<br>📌 ログイン → 「詳しく見る」ページ → <b>Ctrl+A → Ctrl+C</b>`,
+  'mitsubishi-ft': `<b style="color:var(--accent2)">三菱UFJ eスマート証券</b>：投資信託残高照会ページをCtrl+A→Ctrl+Cでコピーして貼り付けてください<br>📌 上部メニュー <b>資産管理 → 残高照会 → 投資信託</b> → Ctrl+A → Ctrl+C`,
+  'sbi-foreign': `<b style="color:var(--accent2)">SBI証券（外国株）</b>：外国株式トップ → 口座管理 → 口座サマリー<br>ページ全体を <b>Ctrl+A → Ctrl+C</b> でコピーして下のテキストエリアに貼り付けてください`,
+  custom: ``,
+};
+
+const BROKER_DISPLAY_NAMES = {
+  rakuten:'楽天証券', sbi:'SBI証券(国内)', 'sbi-foreign':'SBI証券(外国)', nomura:'野村證券', mitsubishi:'三菱eスマート証券',
+  paypay:'PayPay証券', 'nomura-kabu':'野村持株会', 'mitsubishi-ft':'三菱eスマート証券', coincheck:'コインチェック', gmo:'GMOコイン',
+};
+
+function openImportModal() {
+  document.getElementById('importStep1').style.display='';
+  document.getElementById('importStep2').style.display='none';
+  document.getElementById('imp-broker').value='';
+  document.getElementById('imp-file').value='';
+  document.getElementById('imp-format-hint').style.display='none';
+  document.getElementById('imp-custom-hint').style.display='none';
+  document.getElementById('importModalOverlay').classList.add('open');
+  document.getElementById('imp-broker').onchange = onImportBrokerChange;
+}
+function closeImportModal() {
+  document.getElementById('importModalOverlay').classList.remove('open');
+  importedRows=[];
+}
+function backToImportStep1() {
+  document.getElementById('importStep1').style.display='';
+  document.getElementById('importStep2').style.display='none';
+}
+function onImportBrokerChange() {
+  const b=document.getElementById('imp-broker').value;
+  const hint=document.getElementById('imp-format-hint');
+  const customHint=document.getElementById('imp-custom-hint');
+  const pasteArea=document.getElementById('imp-paste-area');
+  const fileGroup=document.getElementById('imp-file').closest('.form-group');
+
+  const freetextArea=document.getElementById('imp-freetext-area');
+  const isPaste=(b==='sbi-foreign');
+  const isFreetext=(b==='freetext'||b==='nomura-kabu'||b==='mitsubishi-ft');
+  const isMulti=(b==='gmo'||b==='coincheck');
+  const fileInput=document.getElementById('imp-file');
+  fileInput.multiple=isMulti;
+  fileInput.title=isMulti?'複数年分のCSVを同時に選択できます（Ctrl/Cmd+クリック）':'';
+  fileGroup.style.display=(isPaste||isFreetext)?'none':'';
+  pasteArea.style.display=isPaste?'':'none';
+  if(freetextArea) freetextArea.style.display=isFreetext?'':'none';
+
+  if(b==='custom'){ hint.style.display='none'; customHint.style.display=''; }
+  else if(isFreetext){ hint.innerHTML='<b style="color:var(--accent2)">フリーテキスト</b>：残高照会ページをCtrl+A→Ctrl+Cでコピーして貼り付けてください。<br>📌 <b>三菱UFJ eスマート証券</b>：上部メニュー 資産管理 → 残高照会 → 投資信託 → Ctrl+A<br>📌 <b>野村持株会</b>：ログイン後「詳しく見る」ページ → Ctrl+A'; hint.style.display=''; customHint.style.display='none'; }
+  else if(b && BROKER_FORMAT_HINTS[b]){ hint.innerHTML=BROKER_FORMAT_HINTS[b]; hint.style.display=''; customHint.style.display='none'; }
+  else { hint.style.display='none'; customHint.style.display='none'; }
+}
+
+// ─── デコード（FileReader方式で確実なShift-JIS対応） ───
+function decodeCSV(buffer) {
+  const bytes = new Uint8Array(buffer);
+  if(bytes[0]===0xEF && bytes[1]===0xBB && bytes[2]===0xBF)
+    return new TextDecoder('utf-8').decode(buffer);
+  try {
+    const t = new TextDecoder('utf-8',{fatal:true}).decode(buffer);
+    return t;
+  } catch(e){}
+  for(const enc of ['shift-jis','shift_jis','sjis','x-sjis','windows-31j','cp932']) {
+    try {
+      const t = new TextDecoder(enc,{fatal:true}).decode(buffer);
+      if(t && !t.includes('\uFFFD')) return t;
+    } catch(e){}
+  }
+  return new TextDecoder('utf-8',{fatal:false}).decode(buffer);
+}
+
+function readFileAsText(file, encoding) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsText(file, encoding);
+  });
+}
+function readFileAsArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// ─── CSV行パーサー（クォート・カンマ対応） ───
+function parseCSVLine(line) {
+  const result=[];
+  let cur='', inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){ if(inQ && line[i+1]==='"'){cur+='"';i++;} else inQ=!inQ; }
+    else if(c===',' && !inQ){ result.push(cur.trim()); cur=''; }
+    else cur+=c;
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+function cleanNum(s) {
+  if(s==null) return '';
+  return String(s).replace(/,/g,'').replace(/^\+/,'').replace(/[^\d.\-]/g,'');
+}
+
+// ─── 資産分類推定ヘルパー ───
+function guessCategoryFromName(name, sectionHint) {
+  const n = (name||'').replace(/　/g,' ');
+  if(sectionHint) {
+    if(sectionHint.includes('投資信託') || sectionHint.includes('ファンド')) {
+      if(n.includes('債券') || n.includes('ボンド') || n.includes('バランス') || n.includes('円奏') || n.includes('資産複合') || n.includes('ミックス')) return '投信：債券';
+      if(n.includes('コモディティ') || n.includes('REIT') || n.includes('リート') || (n.includes('金') && !n.includes('銀行') && !n.includes('金融')) || n.includes('ゴールド') || n.includes('純金') || n.includes('Gold')) return '投信：コモディティ';
+      return '投信：株';
+    }
+    if(sectionHint.includes('株式')) return '株';
+    if(sectionHint.includes('債券')) return '債券';
+    if(sectionHint.includes('REIT') || sectionHint.includes('リート')) return 'コモディティ';
+  }
+  if(n.includes('債券') || n.includes('ボンド') || n.includes('Bond') || n.includes('バランス') || n.includes('円奏') || n.includes('資産複合')) {
+    if(n.includes('ファンド') || n.includes('インデックス')) return '投信：債券';
+    return '債券';
+  }
+  if((n.includes('金') && !n.includes('銀行') && !n.includes('金融')) || n.includes('ゴールド') || n.includes('プラチナ') || n.includes('Gold') || n.includes('純金')) return 'コモディティ';
+  if(n.includes('ファンド') || n.includes('インデックス') || n.includes('ETF') && n.match(/[ぁ-んァ-ヶ]/)) return '投信：株';
+  return '株';
+}
+
+// ─── 楽天証券パーサー ───
+// 実際のフォーマット：
+//   行1-31: サマリー・メタ情報（「■ 保有商品詳細」まで）
+//   行32: ヘッダー → 種別,銘柄コード・ティッカー,銘柄,口座,保有数量,［単位］,平均取得価額,［単位］,現在値,…
+//   行33〜: データ行
+function parseRakuten(text, brokerName) {
+  const lines = text.split(/\r?\n/);
+  let headerIdx = -1;
+
+  // ヘッダー行を探す（複数の条件で試みる）
+  // パターン1: 「種別」「銘柄」「保有数量」を含む行（クォート除去後）
+  for(let i=0;i<lines.length;i++){
+    const raw = lines[i].replace(/"/g,'').replace(/\s/g,'');
+    if(raw.includes('種別') && (raw.includes('銘柄') || raw.includes('ファンド')) && raw.includes('保有数量')){
+      headerIdx = i; break;
+    }
+  }
+  // パターン2: 「■ 保有商品詳細」の直後で最初の多列行
+  if(headerIdx < 0) {
+    let afterDetail = false;
+    for(let i=0;i<lines.length;i++){
+      const raw = lines[i].replace(/"/g,'');
+      if(raw.includes('保有商品詳細') || raw.includes('保有銘柄詳細')) { afterDetail=true; continue; }
+      if(afterDetail && lines[i].split(',').length >= 10) { headerIdx=i; break; }
+    }
+  }
+  if(headerIdx < 0) {
+    throw new Error('楽天証券CSV: ヘッダーが見つかりません（先頭: ' + (lines[0]||'').slice(0,20) + '）。「保有商品一覧（すべて）」のCSVを使用してください');
+  }
+
+  const headers = parseCSVLine(lines[headerIdx]);
+  const fi = (name) => headers.findIndex(h=>h.includes(name));
+
+  // 実列インデックス（実CSVより）
+  // 0:種別 1:銘柄コード 2:銘柄 3:口座 4:保有数量 5:[単位] 6:平均取得価額 7:[単位] 8:現在値 9:[単位] ...14:時価評価額[円]
+  const iType = fi('種別');
+  const iCode = fi('銘柄コード');
+  // '銘柄'は'銘柄コード'にもマッチするので、完全一致 or '銘柄コード'でないものを優先
+  const iName = headers.findIndex(h=>h==='銘柄') >= 0
+    ? headers.findIndex(h=>h==='銘柄')
+    : fi('銘柄');
+  const iAcct = fi('口座');
+  const iQty  = fi('保有数量');
+  const iCost = fi('平均取得価額');
+  const iPrice= fi('現在値');
+
+  if(iName < 0) throw new Error('楽天証券CSV: 銘柄列が見つかりません');
+
+  const rows = [];
+  for(let i=headerIdx+1;i<lines.length;i++){
+    const line = lines[i].trim();
+    if(!line) continue;
+    const cols = parseCSVLine(line);
+    if(cols.length < 5) continue;
+
+    const typeName = (iType>=0 ? cols[iType] : '').trim();
+    // 合計行・参考レート行などをスキップ
+    if(!typeName || typeName.startsWith('■') || typeName.includes('合計') || typeName.includes('参考')) continue;
+    // 投資信託・株式・国内株式 などの分類行をスキップ（2列以下）
+    if(cols.filter(c=>c).length < 4) continue;
+
+    const name = (iName>=0 ? cols[iName] : '').trim();
+    if(!name) continue;
+
+    const acct = (iAcct>=0 ? cols[iAcct] : '').trim();
+    const qty  = parseFloat(cleanNum(iQty>=0 ? cols[iQty] : '')) || 0;
+    const cost = parseFloat(cleanNum(iCost>=0 ? cols[iCost] : '')) || 0;
+    const price= parseFloat(cleanNum(iPrice>=0 ? cols[iPrice] : '')) || 0;
+    const code = (iCode>=0 ? cols[iCode] : '').trim();
+    const nisa = acct.includes('NISA') || acct.includes('つみたて');
+
+    // 通貨判定：「参考為替」列が埋まっていればUSD
+    const currency = 'JPY'; // 楽天CSVは全円建て表示（外貨は参考為替換算済）
+
+    // 資産分類
+    let category = guessCategoryFromName(name, typeName);
+    let isToushinFlag = false;
+    if(typeName === '投資信託') {
+      isToushinFlag = true;
+      if(name.includes('債券') || name.includes('ボンド') || name.includes('バランス') || name.includes('円奏') || name.includes('資産複合') || name.includes('ミックス')) category='投信：債券';
+      else if(name.includes('コモディティ') || (name.includes('金') && !name.includes('銀行') && !name.includes('金融')) || name.includes('ゴールド') || name.includes('プラチナ') || name.includes('純金') || name.includes('Gold')) category='投信：コモディティ';
+      else category='投信：株';
+    } else if(typeName === '国内株式' || typeName === '株式') {
+      category='株';
+    } else if(typeName === '米国株式') {
+      category='株';
+    }
+
+    rows.push({ broker:brokerName, name, category, currency, ticker:code||'', qty, cost, price, nisa, memo:acct, isToushin:isToushinFlag });
+  }
+  if(!rows.length) throw new Error('楽天証券CSV: インポート可能な銘柄が見つかりませんでした');
+  return rows;
+}
+
+// ─── SBI証券パーサー ───
+// 実際のフォーマット：
+//   セクション行: 「株式（現物/特定預り）」「投資信託（金額/NISA預り（つみたて投資枠））」など（カンマなし）
+//   ヘッダー行: 「銘柄（コード）」または「ファンド名」から始まる
+//   データ行: 銘柄名（コード付き）,買付日,数量,取得単価,現在値,...
+//   合計行: 「株式(現物/特定預り)合計」など（スキップ）
+function parseSBI(text, brokerName) {
+  const lines = text.split(/\r?\n/);
+  const rows = [];
+  let currentSection = '';
+  let inData = false;
+  let headers = [];
+
+  for(let i=0;i<lines.length;i++){
+    const raw = lines[i];
+    const line = raw.trim();
+    if(!line) { inData=false; headers=[]; continue; }
+
+    const cols = parseCSVLine(line);
+    const first = cols[0] || '';
+
+    // セクション行判定（合計行を含む、カンマ区切りが少ない行）
+    if(cols.filter(c=>c).length <= 2 && (
+      /^(株式|投資信託|債券|REIT|外国株式|先物|総合計|ポートフォリオ)/.test(first) ||
+      first.includes('預り）') || first.includes('預り)') || first === '総合計'
+    )) {
+      if(!first.includes('合計')) currentSection = first;
+      inData = false; headers = [];
+      continue;
+    }
+
+    // ヘッダー行判定（銘柄（コード）またはファンド名から始まる）
+    if(!inData && (first==='銘柄（コード）' || first==='ファンド名' || first==='銘柄名')) {
+      headers = cols; inData = true; continue;
+    }
+
+    // 合計行スキップ
+    if(first.includes('合計')) { inData=false; headers=[]; continue; }
+
+    // データ行
+    if(inData && headers.length > 0 && cols.length >= 4) {
+      // ヘッダー: 銘柄（コード）,買付日,数量,取得単価,現在値,前日比,前日比（％）,損益,損益（％）,評価額
+      // 実際のデータ: "1687 アグリＥＴＦ",2022/05/26,50,938,1021,...
+      // 投信:  "ｅＭＡＸＩＳ Ｓｌｉｍ...","----/--/--",28915,15563,15359,...
+      const rawName = first;
+      // 銘柄名とコードを分離（「1687 アグリＥＴＦ」→コード=1687、名前=アグリＥＴＦ）
+      const codeMatch = rawName.match(/^(\d{4})\s+(.+)$/);
+      let name = rawName.trim();
+      let code = '';
+      if(codeMatch) { code=codeMatch[1]; name=codeMatch[2].trim(); }
+
+      // 全角→半角
+      name = name.replace(/[Ａ-Ｚａ-ｚ０-９]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+                 .replace(/\s+/g,' ').trim();
+
+      if(!name || name.includes('合計') || name.includes('評価額')) continue;
+
+      const qty   = parseFloat(cleanNum(cols[2])) || 0;
+      const cost  = parseFloat(cleanNum(cols[3])) || 0;
+      const price = parseFloat(cleanNum(cols[4])) || 0;
+
+      // NISA判定
+      const nisa = currentSection.includes('NISA') || currentSection.includes('つみたて');
+
+      // 通貨
+      let currency = 'JPY';
+      if(currentSection.includes('外国') || currentSection.includes('米国')) currency='USD';
+
+      // 資産分類
+      let category = '投信：株';
+      if(currentSection.includes('投資信託') || first==='ファンド名') {
+        if(name.includes('債券') || name.includes('Bond')) category='投信：債券';
+        else category='投信：株';
+      } else if(currentSection.includes('株式')) {
+        category='株';
+      } else if(currentSection.includes('債券')) {
+        category='債券';
+      }
+
+      const _sbiIsToushin = currentSection.includes('投資信託') || first==='ファンド名';
+      rows.push({ broker:brokerName, name, category, currency, ticker:code, qty, cost, price, nisa, memo:currentSection, isToushin:_sbiIsToushin });
+    }
+  }
+  if(!rows.length) throw new Error('SBI証券CSV: インポート可能な銘柄が見つかりませんでした');
+  return rows;
+}
+
+// ─── SBI証券 外国株コピペパーサー ───
+// 口座サマリーページのテキストコピペから銘柄・預り金を取得
+function parseSBIForeign(text, brokerName) {
+  const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l);
+  const rows = [];
+
+  // 取引所サフィックス除去
+  const EXCHANGES = ['NYSE Arca','NYSE','NASDAQ','MAIN','TSX'];
+  function cleanTicker(raw) {
+    for(const ex of EXCHANGES) {
+      if(raw.endsWith(ex)) return raw.slice(0,-ex.length).trim();
+    }
+    return raw.trim();
+  }
+
+  // 通貨付き金額行: "100.58 USD" or "+903.06 USD" or "902,003 円"
+  const AMT_RE = /^[+\-]?([\d,]+\.?\d*)\s+(USD|HKD|KRW|JPY|円)$/;
+  // 数量行: 純粋な整数カンマ区切り
+  const QTY_RE = /^[\d,]+$/;
+  // ティッカー行: 英大文字または数字で始まり取引所名が続く
+  const TICK_RE = /^([A-Z0-9\.]{1,6})(NYSE Arca|NYSE|NASDAQ|MAIN)$/;
+
+  // ─── 預り金 ───
+  const DEPOSIT_MAP = {'米ドル':'USD','香港ドル':'HKD','日本円':'JPY'};
+  let inDeposit=false;
+  for(let i=0;i<lines.length;i++) {
+    const l=lines[i];
+    if(l==='預り金') { inDeposit=true; continue; }
+    if(l==='保有証券'||l==='保有銘柄一覧') { inDeposit=false; continue; }
+    if(!inDeposit) continue;
+    for(const [jpName, cur] of Object.entries(DEPOSIT_MAP)) {
+      if(l===jpName) {
+        // 次行: "15,330.90 USD" or "902,003 円"
+        const next=lines[i+1]||'';
+        const m=AMT_RE.exec(next);
+        if(m) {
+          const amt=parseFloat(m[1].replace(/,/g,''));
+          if(amt>0) {
+            rows.push({
+              broker:brokerName, name:`${jpName}預り金`,
+              category:'現金', currency:cur,
+              qty:amt, cost:0, price:0, nisa:false,
+              memo:'外国株口座預り金'
+            });
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  // ─── 銘柄 ───
+  let sectionNisa=false;
+  let pendingName='';
+
+  for(let i=0;i<lines.length;i++) {
+    const l=lines[i];
+
+    if(l.includes('株式(現物/特定)')||l.includes('株式（現物/特定）')) { sectionNisa=false; continue; }
+    if(l.includes('株式(現物/NISA)')||l.includes('株式（現物/NISA）')) { sectionNisa=true; continue; }
+
+    // ヘッダー行・ナビゲーション行をスキップ
+    if(['保有数量','取得単価','現在値','外貨建評価損益','現買','現売','積立',
+        '外貨建','評価損益','評価額','円換算','国','外貨建評価額','円換算評価額',
+        '保有銘柄一覧','保有証券','計','参考レート'].includes(l)) continue;
+
+    // ティッカー行検出
+    const tm=TICK_RE.exec(l);
+    if(tm) {
+      const ticker=cleanTicker(l);
+      const name=pendingName||ticker;
+      pendingName='';
+
+      // 通貨判定
+      let currency='USD';
+      if(l.includes('MAIN') || /^[0-9]/.test(ticker)) currency='HKD';
+
+      // 次の行群から数量・取得単価・現在値を取得
+      let j=i+1;
+      while(j<lines.length && ['現買','現売','積立',''].includes(lines[j])) j++;
+
+      let qty=0, cost=0, price=0;
+      if(j<lines.length && QTY_RE.test(lines[j].replace(/,/g,''))) {
+        qty=parseInt(lines[j].replace(/,/g,'')); j++;
+      }
+      const m1=j<lines.length?AMT_RE.exec(lines[j]):null;
+      if(m1){ cost=parseFloat(m1[1].replace(/,/g,'')); j++; }
+      const m2=j<lines.length?AMT_RE.exec(lines[j]):null;
+      if(m2){ price=parseFloat(m2[1].replace(/,/g,'')); j++; }
+
+      // 分類判定
+      let category='株';
+      const nu=name.toUpperCase();
+      if(nu.includes('ETF')||nu.includes('ISHARES')||nu.includes('SPDR')||nu.includes(' ISHARES')) {
+        if(nu.includes('債券')||nu.includes('BOND')||nu.includes('AGG')||nu.includes('HYG')) category='投信：債券';
+        else if(nu.includes('GOLD')||nu.includes('ゴールド')||nu.includes('GLD')) category='コモディティ';
+        else category='株';
+      }
+
+      if(qty>0 || cost>0) {
+        rows.push({
+          broker:brokerName, name, category, currency,
+          ticker, qty, cost, price,
+          nisa:sectionNisa, memo:sectionNisa?'NISA（成長投資枠）':'特定'
+        });
+      }
+      continue;
+    }
+
+    // ティッカー行の直前行が銘柄名のはず
+    // 次行がTICK_REにマッチするか先読み
+    const nextLine=lines[i+1]||'';
+    if(TICK_RE.test(nextLine)) {
+      pendingName=l;
+    }
+  }
+
+  if(!rows.length) throw new Error('銘柄が見つかりませんでした。口座サマリーページ全体をコピーしてください。');
+  return rows;
+}
+
+// ─── フリーテキストパーサー（三菱UFJ eスマート・野村持株会等） ───
+// ペーストされたページテキストから 銘柄名・口数・基準価額・個別元本 を抽出
+function parseNomuraHoldings(text, brokerName) {
+  // 野村持株会の残高照会ページから持株情報を抽出
+  const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l);
+
+  // 銘柄コード（4〜5桁）と銘柄名を探す
+  let ticker = '', name = '';
+  for(let i=0; i<lines.length-1; i++) {
+    if(/^\d{4,5}$/.test(lines[i]) && /[ぁ-んァ-ヶ一-龯]/.test(lines[i+1])) {
+      ticker = lines[i];
+      name = lines[i+1].replace(/\s*グループ.*/, '').trim(); // 「旭化成グループ持株会」などを除去
+      // 名前がすでに会社名に見えるか確認
+      if(name.length > 0 && name.length < 20) break;
+    }
+  }
+  // 別の方法: 「お買付銘柄」の次の行に銘柄コードがある場合
+  if(!ticker) {
+    const idx = lines.findIndex(l=>l.includes('お買付銘柄'));
+    if(idx >= 0) {
+      for(let i=idx+1; i<Math.min(idx+5, lines.length); i++) {
+        if(/^\d{4,5}$/.test(lines[i])) { ticker=lines[i]; name=lines[i+1]||''; break; }
+      }
+    }
+  }
+
+  // 現在の株数
+  let qty = 0;
+  for(const l of lines) {
+    const m = l.match(/^([\d,]+\.?\d*)\s*株$/);
+    if(m && !l.includes('引出') && !l.includes('投資')) {
+      const v = parseFloat(m[1].replace(/,/g,''));
+      if(v > 0 && v < 1000000) { qty = v; break; }
+    }
+  }
+  // 「現在の株数」の次の行
+  if(!qty) {
+    const idx = lines.findIndex(l=>l==='現在の株数'||l.includes('現在の株数'));
+    if(idx>=0 && idx+1<lines.length) {
+      const m = lines[idx+1].match(/([\d,]+\.?\d*)/);
+      if(m) qty = parseFloat(m[1].replace(/,/g,''));
+    }
+  }
+
+  // 現在値（終値）
+  let price = 0;
+  for(const l of lines) {
+    const m = l.match(/終値[、,]\s*([\d,]+\.?\d*)円/);
+    if(m) { price = parseFloat(m[1].replace(/,/g,'')); break; }
+  }
+
+  // 平均買付価格（取得単価）
+  let cost = 0;
+  for(let i=0; i<lines.length; i++) {
+    if(lines[i].includes('平均買付価格')) {
+      // 同じ行または次の行から数字を取得
+      const full = lines[i] + ' ' + (lines[i+1]||'');
+      const m = full.match(/([\d,]+\.?\d*)円/);
+      if(m) { cost = parseFloat(m[1].replace(/,/g,'')); break; }
+    }
+  }
+
+  if(!name || !qty) throw new Error('銘柄データが見つかりませんでした。\n「詳しく見る」ページをCtrl+A → Ctrl+Cでコピーしてください。\n（銘柄コード・株数・平均買付価格が含まれているか確認してください）');
+
+  return [{ broker:brokerName, name, category:'株', currency:'JPY', ticker, qty, cost:cost||0, price:price||0, nisa:false, isToushin:false, memo:'' }];
+}
+
+function parseFreeText(text, brokerName) {
+  const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l);
+  const rows = [];
+
+  // 全角→半角変換
+  function toHalf(s) {
+    return s.replace(/[Ａ-Ｚａ-ｚ０-９]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+            .replace(/　/g,' ').trim();
+  }
+  // 数字（カンマ区切り）を抽出
+  function extractNum(s) {
+    const m = s.replace(/,/g,'').match(/[+-]?[\d]+(?:\.\d+)?/);
+    return m ? parseFloat(m[0]) : null;
+  }
+  // 円金額を含む行かどうか
+  const AMOUNT_RE = /^[+\-]?[\d,]+(?:\.\d+)?円/;
+  // 口数行（投資信託）
+  const QTY_RE = /(\d[\d,]*)\s*口/;
+  // 株数行（持株会・個別株）
+  const STK_RE = /(\d[\d,]*)\s*株(?!式会社|主|価|券)/;
+  // 日本語を含む行（ファンド名候補）
+  const JP_RE = /[ぁ-んァ-ヶ一-龯ｦ-ﾟ]/;
+  // スキップすべきUI要素っぽい行
+  const SKIP_RE = /^(印刷|最新|全て|特定|一般|NISA|再投資|明細|ファンド名|課税区分|評価|取引|注文|CSVダウンロード|1-|ご注意|ページ|コピー|カスタマイズ|お取引|マイページ|Copyright|三菱UFJ eスマート証券$|残高照会|投資信託$|MMF|評価額合計|評価損益合計|\d+P$|投信ポイント|ポイント対象|ご注意事項|分配金|単価$|積立$)/;
+
+  let i = 0;
+  while(i < lines.length) {
+    const l = lines[i];
+
+    // 株数行（持株会）を発見したらアンカーに
+    const stkMatch = !l.match(QTY_RE) && l.match(STK_RE);
+    if(stkMatch) {
+      const qty = parseInt(stkMatch[1].replace(/,/g,''));
+      if(qty > 0) {
+        // 銘柄名を遡って探す
+        let name = '';
+        for(let j=i-1; j>=Math.max(0,i-8); j--) {
+          const cand = lines[j];
+          if(JP_RE.test(cand) && !AMOUNT_RE.test(cand) && !SKIP_RE.test(cand) && cand.length > 3) {
+            name = toHalf(cand.split(/\t/)[0].trim()); break;
+          }
+        }
+        // 現在値・平均買付価格を探す（前後5行の円金額）
+        const prices = [];
+        for(let j=Math.max(0,i-5); j<=Math.min(lines.length-1,i+5); j++) {
+          const m = lines[j].match(/([\d,]+(?:\.\d+)?)円/);
+          if(m) prices.push(parseFloat(m[1].replace(/,/g,'')));
+        }
+        const price = prices[0]||0;
+        const cost = prices[1]||price;
+        if(name && qty > 0) {
+          rows.push({ broker:brokerName, name, category:'株', currency:'JPY',
+            ticker:'', qty, cost, price, nisa:false, isToushin:false, memo:'' });
+        }
+      }
+      i++; continue;
+    }
+
+    // 口数行を発見したらそこをアンカーに
+    const qtyMatch = l.match(QTY_RE);
+    if(qtyMatch) {
+      const qty = parseInt(qtyMatch[1].replace(/,/g,''));
+      if(qty <= 0) { i++; continue; }
+
+      // ファンド名を遡って探す（最大10行前まで）
+      let name = '';
+      for(let j=i-1; j>=Math.max(0,i-10); j--) {
+        const cand = lines[j];
+        if(JP_RE.test(cand) && !AMOUNT_RE.test(cand) && !SKIP_RE.test(cand) && cand.length > 4) {
+          // タブ区切りの場合は最初の要素をファンド名として使う
+          name = toHalf(cand.split(/\t/)[0].trim());
+          break;
+        }
+      }
+
+      // 基準価額を探す（口数行の直前の円金額行）
+      let price = 0;
+      for(let j=i-1; j>=Math.max(0,i-5); j--) {
+        const m = lines[j].match(/^([\d,]+(?:\.\d+)?)円/);
+        if(m) { price = parseFloat(m[1].replace(/,/g,'')); break; }
+      }
+
+      // 個別元本を探す（口数と同じ行のタブ区切り2番目 or 口数行の次の円金額行）
+      let cost = 0;
+      const sameLineParts = l.split(/\t|\s{2,}/);
+      for(let p=1; p<sameLineParts.length; p++) {
+        const m = sameLineParts[p].match(/^([\d,]+(?:\.\d+)?)円/);
+        if(m) { cost = parseFloat(m[1].replace(/,/g,'')); break; }
+      }
+      if(!cost && i+1<lines.length) {
+        const m = lines[i+1].match(/^([\d,]+(?:\.\d+)?)円/);
+        if(m) cost = parseFloat(m[1].replace(/,/g,''));
+      }
+
+      if(name && qty > 0 && (price > 0 || cost > 0)) {
+        rows.push({
+          broker: brokerName,
+          name,
+          category: guessCategoryFromName(name, '投資信託'),
+          currency: 'JPY',
+          ticker: '',
+          qty,
+          cost: cost || price,
+          price: price || cost,
+          nisa: false,
+          isToushin: true,
+          memo: ''
+        });
+      }
+    }
+    i++;
+  }
+
+  if(!rows.length) throw new Error('銘柄が見つかりませんでした。\n三菱UFJ eスマート：資産管理→残高照会→投資信託ページをCtrl+A\n野村持株会：詳しく見るページをCtrl+A でコピーしてください。');
+  return rows;
+}
+
+// ─── 野村證券パーサー ───
+// 実際のフォーマット（UTF-8 BOM）：
+//   行1: 預り資産（預り証券）
+//   行5: 商品分類サマリーヘッダー
+//   行12: 詳細ヘッダー → 商品,銘柄コード,ティッカー,銘柄名,...,預り区分,保有数量,...,取得コスト（円）,...,現在値,...,評価額（円）,評価損益（円）,...
+//   行13〜: データ行
+function parseNomura(text, brokerName) {
+  const lines = text.split(/\r?\n/);
+  let headerIdx = -1;
+
+  for(let i=0;i<lines.length;i++){
+    const cols = parseCSVLine(lines[i]);
+    if(cols[0]==='商品' && cols.some(c=>c==='銘柄名') && cols.some(c=>c.includes('保有数量'))){
+      headerIdx=i; break;
+    }
+  }
+  if(headerIdx<0) throw new Error('野村證券CSV: ヘッダー行が見つかりません');
+
+  const headers = parseCSVLine(lines[headerIdx]);
+  const fi = (...names)=>{ for(const n of names){ const i=headers.findIndex(h=>h===n||h.includes(n)); if(i>=0)return i; } return -1; };
+
+  const iType  = fi('商品');
+  const iCode  = fi('銘柄コード');
+  const iTick  = fi('ティッカー');
+  const iName  = fi('銘柄名');
+  const iAcct  = fi('預り区分');
+  const iQty   = fi('保有数量');
+  const iCost  = fi('取得コスト（円）','取得コスト');
+  const iPrice = fi('現在値');
+  const iEval  = fi('評価額（円）','評価額');
+  const iCur   = fi('通貨');
+
+  if(iName<0) throw new Error('野村證券CSV: 銘柄名列が見つかりません');
+
+  const rows=[];
+  for(let i=headerIdx+1;i<lines.length;i++){
+    const line=lines[i].trim(); if(!line) continue;
+    const cols=parseCSVLine(line);
+    const name=(iName>=0?cols[iName]:'').trim();
+    if(!name || name.includes('合計')) continue;
+    // MRF/お預り金 → 現金として取り込む
+    if(name.includes('MRF') || name.includes('お預り金') || name.includes('預り金')) {
+      // 残高は行5-6のサマリー部分にある: "MRF/お預り金", 金額
+      // ここでは銘柄詳細セクション外のためスキップ（別途サマリー行から取得）
+      continue;
+    }
+
+    const typeName=(iType>=0?cols[iType]:'').trim();
+    const acct=(iAcct>=0?cols[iAcct]:'').trim();
+    const code=(iCode>=0?cols[iCode]:'').trim();
+    const ticker=(iTick>=0?cols[iTick]:'').trim();
+    const qty=parseFloat(cleanNum(iQty>=0?cols[iQty]:''))||0;
+    const nisa=acct.includes('NISA')||acct.includes('つみたて');
+
+    // 取得コスト（円）は合計額なので単価を計算
+    // 「取得コスト（円）」は取得単価そのもの（合計ではなく単価）
+    const cost=parseFloat(cleanNum(iCost>=0?cols[iCost]:''))||0;
+    const price=parseFloat(cleanNum(iPrice>=0?cols[iPrice]:''))||0;
+
+    // 通貨
+    let currency=(iCur>=0?cols[iCur]:'').trim()||'JPY';
+    if(!currency||currency==='-') currency='JPY';
+
+    // 資産分類
+    let category=guessCategoryFromName(name, typeName);
+    if(typeName==='株式') category='株';
+    else if(typeName==='投資信託') category=guessCategoryFromName(name,'投資信託');
+    else if(typeName==='債券') category='債券';
+
+    rows.push({ broker:brokerName, name, category, currency, ticker:ticker||code, qty, cost, price, nisa, memo:acct });
+  }
+  if(!rows.length) throw new Error('野村證券CSV: インポート可能な銘柄が見つかりませんでした');
+
+  // MRF/お預り金をサマリー行（行5-7）から取得
+  // フォーマット: 行5: 商品分類,残高,...  行6: "MRF/お預り金","金額",...
+  for(let i=0;i<Math.min(lines.length,10);i++){
+    const l=lines[i].trim(); if(!l) continue;
+    const cols=parseCSVLine(l);
+    if(cols[0] && (cols[0].includes('MRF') || cols[0].includes('お預り金'))) {
+      const amt=parseFloat(cleanNum(cols[1]||''))||0;
+      if(amt>0) {
+        rows.push({
+          broker:brokerName, name:'野村MRF（預り金）',
+          category:'現金', currency:'JPY',
+          qty:amt, cost:0, price:0, nisa:false, memo:'MRF/お預り金'
+        });
+      }
+    }
+  }
+
+  return rows;
+}
+
+// ─── 汎用CSVパーサー ───
+function parseCoincheck(texts, brokerName) {
+  // 様式1形式: 取引日時, 取引種別, 増加通貨名, 増加数量, 減少通貨名, 減少数量, 約定価格/単価
+  const holdings={}, totalCost={};
+  const allRows=[];
+  for(const text of texts){
+    const lines=text.split(/\r?\n/);
+    const headerIdx=lines.findIndex(l=>l.includes('取引日時')||l.includes('取引種別'));
+    if(headerIdx<0) continue;
+    const headers=parseCSVLine(lines[headerIdx]);
+    const fi=(...names)=>{ for(const n of names){ const i=headers.findIndex(h=>h.includes(n)); if(i>=0)return i; } return -1; };
+    const iDate=fi('取引日時'); const iType=fi('取引種別');
+    const iIC=fi('増加通貨名'); const iIQ=fi('増加数量');
+    const iDC=fi('減少通貨名'); const iDQ=fi('減少数量');
+    const iPrice=fi('約定価格','単価');
+    for(let i=headerIdx+1;i<lines.length;i++){
+      const line=lines[i].trim(); if(!line) continue;
+      const cols=parseCSVLine(line);
+      allRows.push({ date:cols[iDate]?.trim()||'', type:cols[iType]?.trim()||'',
+        incCoin:cols[iIC]?.trim()||'', incQty:parseFloat(cols[iIQ])||0,
+        decCoin:cols[iDC]?.trim()||'', decQty:parseFloat(cols[iDQ])||0,
+        price:parseFloat(cols[iPrice])||0 });
+    }
+  }
+  allRows.sort((a,b)=>a.date.localeCompare(b.date));
+  for(const {type,incCoin,incQty,decCoin,decQty,price} of allRows){
+    if(type==='購入' && incCoin && incCoin!=='JPY' && incQty>0){
+      const cost = decCoin==='JPY' ? decQty : incQty*price;
+      holdings[incCoin]=(holdings[incCoin]||0)+incQty;
+      totalCost[incCoin]=(totalCost[incCoin]||0)+cost;
+    } else if(type==='売却' && decCoin && decCoin!=='JPY' && decQty>0){
+      const oldQty=holdings[decCoin]||0;
+      if(oldQty>0){
+        const avg=(totalCost[decCoin]||0)/oldQty;
+        holdings[decCoin]=Math.max(0,oldQty-decQty);
+        totalCost[decCoin]=Math.max(0,(totalCost[decCoin]||0)-avg*decQty);
+      }
+    }
+  }
+  const CNAMES={BTC:'ビットコイン(BTC)',ETH:'イーサリアム(ETH)',XRP:'リップル(XRP)'};
+  const rows=[];
+  for(const [coin,qty] of Object.entries(holdings)){
+    if(qty<0.000001) continue;
+    const cost=(totalCost[coin]||0)/qty;
+    rows.push({broker:brokerName,name:CNAMES[coin]||coin,category:'暗号通貨',currency:coin,ticker:'',qty,cost,price:0,nisa:false,memo:''});
+  }
+  if(!rows.length) throw new Error('保有コインが見つかりませんでした（購入→全売却済みの可能性があります）');
+  return rows;
+}
+
+function parseGMO(texts, brokerName) {
+  // trading_report形式: 日時, 精算区分, 銘柄名, 売買区分, 約定数量, 約定金額, 授受区分, 数量, 送付先/送付元
+  const holdings={}, totalCost={};
+  const allRows=[];
+  for(const text of texts){
+    const lines=text.split(/\r?\n/);
+    const headerIdx=lines.findIndex(l=>l.includes('精算区分'));
+    if(headerIdx<0) continue;
+    const headers=parseCSVLine(lines[headerIdx]);
+    const fi=(...names)=>{ for(const n of names){ const i=headers.findIndex(h=>h.includes(n)); if(i>=0)return i; } return -1; };
+    const iDate=fi('日時'); const iCat=fi('精算区分'); const iCoin=fi('銘柄名');
+    const iSide=fi('売買区分'); const iQty=fi('約定数量'); const iAmount=fi('約定金額');
+    const iAuth=fi('授受区分'); const iStkQty=fi('数量'); const iSrc=fi('送付先/送付元');
+    for(let i=headerIdx+1;i<lines.length;i++){
+      const line=lines[i].trim(); if(!line) continue;
+      const cols=parseCSVLine(line);
+      allRows.push({ date:cols[iDate]?.trim()||'', cat:cols[iCat]?.trim()||'',
+        coin:cols[iCoin]?.trim()||'', side:cols[iSide]?.trim()||'',
+        qty:parseFloat(cols[iQty])||0, amount:parseFloat(cols[iAmount])||0,
+        auth:cols[iAuth]?.trim()||'', stkQty:parseFloat(cols[iStkQty])||0,
+        src:cols[iSrc]?.trim()||'' });
+    }
+  }
+  allRows.sort((a,b)=>a.date.localeCompare(b.date));
+  for(const {cat,coin,side,qty,amount,auth,stkQty,src} of allRows){
+    if(cat.includes('取引所現物取引') && coin && qty>0){
+      if(side==='買'){
+        holdings[coin]=(holdings[coin]||0)+qty;
+        totalCost[coin]=(totalCost[coin]||0)+amount;
+      } else if(side==='売'){
+        const oldQty=holdings[coin]||0;
+        if(oldQty>0){
+          const avg=(totalCost[coin]||0)/oldQty;
+          holdings[coin]=Math.max(0,oldQty-qty);
+          totalCost[coin]=Math.max(0,(totalCost[coin]||0)-avg*qty);
+        }
+      }
+    } else if(cat.includes('暗号資産預入・送付') && coin && stkQty>0){
+      if(auth==='預入' && src.includes('ステーキング') && !src.includes('手数料')){
+        holdings[coin]=(holdings[coin]||0)+stkQty;
+        // ステーキング報酬はコスト0扱い（保有量のみ加算）
+      } else if(auth==='送付' && src.includes('ステーキング手数料')){
+        holdings[coin]=Math.max(0,(holdings[coin]||0)-stkQty);
+      }
+    }
+  }
+  const CNAMES={BTC:'ビットコイン(BTC)',ETH:'イーサリアム(ETH)',XRP:'リップル(XRP)'};
+  const rows=[];
+  for(const [coin,qty] of Object.entries(holdings)){
+    if(qty<0.000001) continue;
+    const cost=qty>0?(totalCost[coin]||0)/qty:0;
+    rows.push({broker:brokerName,name:CNAMES[coin]||coin,category:'暗号通貨',currency:coin,ticker:'',qty,cost,price:0,nisa:false,memo:''});
+  }
+  if(!rows.length) throw new Error('保有コインが見つかりませんでした（購入→全売却済みの可能性があります）');
+  return rows;
+}
+
+function parseGeneric(text, brokerKey, brokerName) {
+  const lines = text.split(/\r?\n/);
+  let headerIdx=0;
+  for(let i=0;i<Math.min(10,lines.length);i++){
+    if(lines[i].trim()){ headerIdx=i; break; }
+  }
+  const headers=parseCSVLine(lines[headerIdx]);
+  const fi=(...names)=>{ for(const n of names){ const i=headers.findIndex(h=>h.includes(n)); if(i>=0)return i; } return -1; };
+
+  const iName  = fi('銘柄名','銘柄','ファンド名','name','資産名');
+  const iCat   = fi('資産分類','分類','カテゴリ','category');
+  const iCur   = fi('通貨','currency');
+  const iQty   = fi('保有数量','数量','口数','qty','保有量');
+  const iCost  = fi('取得単価','平均取得','単価','cost','取得価格');
+  const iPrice = fi('現在値','価格','price','評価単価','時価');
+  const iTick  = fi('ティッカー','ticker','コード','銘柄コード');
+  const iNisa  = fi('NISA','nisa');
+  const iMemo  = fi('メモ','memo','備考','note');
+
+  if(iName<0) throw new Error('銘柄名の列が見つかりません。CSVのヘッダーを確認してください。');
+
+  const isCrypto=['coincheck','gmo'].includes(brokerKey);
+  const rows=[];
+  for(let i=headerIdx+1;i<lines.length;i++){
+    const line=lines[i].trim(); if(!line) continue;
+    const cols=parseCSVLine(line);
+    const name=cols[iName]?.trim(); if(!name) continue;
+    let currency=iCur>=0?cols[iCur]?.trim():'JPY';
+    const qty=parseFloat(cleanNum(iQty>=0?cols[iQty]:''))||0;
+    const cost=parseFloat(cleanNum(iCost>=0?cols[iCost]:''))||0;
+    const price=parseFloat(cleanNum(iPrice>=0?cols[iPrice]:''))||0;
+    const ticker=iTick>=0?cols[iTick]?.trim():'';
+    const nisaVal=iNisa>=0?cols[iNisa]?.trim():'';
+    const nisa=nisaVal==='1'||nisaVal==='○'||nisaVal.toUpperCase()==='TRUE';
+    const memo=iMemo>=0?cols[iMemo]?.trim():'';
+    let category=iCat>=0?cols[iCat]?.trim():'投信：株';
+    if(isCrypto){
+      category='暗号通貨';
+      const up=name.toUpperCase();
+      if(up.includes('BTC')||up.includes('BITCOIN')) currency='BTC';
+      else if(up.includes('ETH')||up.includes('ETHER')) currency='ETH';
+      else if(up.includes('XRP')||up.includes('RIPPLE')) currency='XRP';
+      else currency='BTC';
+    }
+    if(!currency) currency='JPY';
+    rows.push({ broker:brokerName, name, category, currency, ticker, qty, cost, price, nisa, memo });
+  }
+  if(!rows.length) throw new Error('インポート可能な銘柄が見つかりませんでした');
+  return rows;
+}
+
+// ─── メインパース処理 ───
+async function parseImportCSV() {
+  const brokerKey=document.getElementById('imp-broker').value;
+  importBrokerName=BROKER_DISPLAY_NAMES[brokerKey]||brokerKey;
+  const fileInput=document.getElementById('imp-file');
+  const file=fileInput.files[0];
+  const files=Array.from(fileInput.files);
+  if(!brokerKey){ showToast('⚠️ 証券会社を選択してください',true); return; }
+  // sbi-foreignはファイル不要なので先に処理
+  // フリーテキストモード
+  if(brokerKey==='freetext'||brokerKey==='nomura-kabu'||brokerKey==='mitsubishi-ft') {
+    const pasteText=document.getElementById('imp-freetext-text').value.trim();
+    if(!pasteText){ showToast('⚠️ テキストを貼り付けてください',true); return; }
+    try {
+      let rows;
+      if(brokerKey==='nomura-kabu') rows=parseNomuraHoldings(pasteText, importBrokerName);
+      else rows=parseFreeText(pasteText, importBrokerName);
+      if(!rows.length) throw new Error('銘柄データが見つかりませんでした');
+      importedRows=rows;
+      showImportPreview(rows);
+      document.getElementById('imp-freetext-text').value='';
+    } catch(e){ showToast('❌ '+e.message, true); console.error(e); }
+    return;
+  }
+  if(brokerKey!=='sbi-foreign' && !file){ showToast('⚠️ CSVファイルを選択してください',true); return; }
+
+  importBrokerName=BROKER_DISPLAY_NAMES[brokerKey]||brokerKey;
+
+  // SBI外国株はテキストエリアから直接取得
+  if(brokerKey==='sbi-foreign') {
+    const pasteText=document.getElementById('imp-paste-text').value.trim();
+    if(!pasteText){ showToast('⚠️ テキストを貼り付けてください',true); return; }
+    try {
+      const rows=parseSBIForeign(pasteText, importBrokerName);
+      if(!rows.length) throw new Error('銘柄が見つかりませんでした。コピー範囲を確認してください。');
+      importedRows=rows;
+      showImportPreview(rows);
+    } catch(e){ showToast('❌ '+e.message, true); console.error(e); }
+    return;
+  }
+
+  const isUtf8 = (brokerKey==='nomura' || brokerKey==='custom' || brokerKey==='mitsubishi' || brokerKey==='paypay' || brokerKey==='coincheck' || brokerKey==='gmo');
+
+  try {
+    let text;
+    if(isUtf8) {
+      // UTF-8（BOM付き含む）はFileReaderで確実に読む
+      text = await readFileAsText(file, 'UTF-8');
+    } else {
+      // Shift-JIS（楽天・SBI・野村持株会等）: ArrayBufferで読んでdecodeCSVで自動判定（ブラウザ差異対応）
+      const buf = await readFileAsArrayBuffer(file);
+      text = decodeCSV(buf);
+    }
+
+    let rows=[];
+    if(brokerKey==='rakuten')      rows=parseRakuten(text, importBrokerName);
+    else if(brokerKey==='sbi')     rows=parseSBI(text, importBrokerName);
+    else if(brokerKey==='nomura')  rows=parseNomura(text, importBrokerName);
+    else if(brokerKey==='coincheck'){
+      const texts=await Promise.all(files.map(f=>readFileAsText(f,'UTF-8')));
+      rows=parseCoincheck(texts, importBrokerName);
+    }
+    else if(brokerKey==='gmo'){
+      const texts=await Promise.all(files.map(f=>readFileAsText(f,'UTF-8')));
+      rows=parseGMO(texts, importBrokerName);
+    }
+    else                           rows=parseGeneric(text, brokerKey, importBrokerName);
+    if(!rows.length) throw new Error('インポート可能な銘柄が見つかりませんでした');
+    importedRows=rows;
+    showImportPreview(rows);
+  } catch(e) {
+    showToast('❌ '+e.message, true);
+    // ブラウザ由来の英語エラーを日本語に変換
+    let msg = e.message || '不明なエラーが発生しました';
+    if(msg.includes('Failed to fetch') || msg.includes('NetworkError')) msg='ネットワークエラー: インターネット接続を確認してください';
+    else if(msg.includes('is not') || msg.includes('cannot read') || msg.toLowerCase().includes('undefined')) msg='CSVの読み込みに失敗しました。ファイル形式・証券会社の選択が正しいか確認してください。（詳細: '+msg+')';
+    showToast('❌ '+msg, true);
+    console.error(e);
+  }
+}
+
+function showImportPreview(rows) {
+  document.getElementById('importStep1').style.display='none';
+  document.getElementById('importStep2').style.display='';
+  document.getElementById('imp-preview-title').textContent=`${importBrokerName} — ${rows.length}件 読み込み完了`;
+  const existingNames=new Set(holdings.map(h=>h.name));
+  const tbody=document.getElementById('imp-preview-body');
+  tbody.innerHTML=rows.map((r,i)=>{
+    const isDup=existingNames.has(r.name);
+    const hasError=!r.name;
+    const icon=hasError?'❌':isDup?'⚠️':'✅';
+    const ic=hasError?'var(--danger)':isDup?'var(--warn)':'var(--accent)';
+    return `<tr style="opacity:${hasError?0.45:1}">
+      <td style="text-align:center;padding:7px 10px">${hasError?'':`<input type="checkbox" class="imp-row-chk" data-idx="${i}" checked style="accent-color:var(--accent)">`}</td>
+      <td style="padding:7px 10px;font-size:12px"><span style="color:${ic};margin-right:4px">${icon}</span>${r.name}</td>
+      <td style="padding:7px 10px">
+        <select class="imp-cat-sel" data-idx="${i}" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;padding:2px 4px">
+          ${['株','債券','コモディティ','暗号通貨','投信：株','投信：債券','投信：コモディティ','現金','その他'].map(c=>`<option value="${c}"${c===r.category?' selected':''}>${c}</option>`).join('')}
+        </select>
+      </td>
+      <td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace;font-size:11px">${(r.qty||r.qty===0)?fmtNum(r.qty,8):'—'}</td>
+      <td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace;font-size:11px">${r.cost?fmtCost(r.cost):'—'}</td>
+      <td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace;font-size:11px">${r.price?fmtCost(r.price):'—'}</td>
+      <td style="padding:7px 10px;font-size:11px">${r.currency}</td>
+      <td style="padding:7px 10px;font-size:10px;color:var(--text-muted);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.memo}">${isDup?'<span style="color:var(--warn)">重複</span> ':''}${r.memo||''}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('imp-check-all').checked=true;
+}
+
+function importSelectAll(v){ document.querySelectorAll('.imp-row-chk').forEach(c=>c.checked=v); document.getElementById('imp-check-all').checked=v; }
+function importCheckAll(v){ importSelectAll(v); }
+
+function executeImport() {
+  const checkedIdxs=new Set([...document.querySelectorAll('.imp-row-chk:checked')].map(c=>parseInt(c.dataset.idx)));
+  const catSels=Object.fromEntries([...document.querySelectorAll('.imp-cat-sel')].map(s=>[parseInt(s.dataset.idx),s.value]));
+  if(!checkedIdxs.size){ showToast('⚠️ 1件以上選択してください',true); return; }
+
+  // インポート対象の行を確定
+  const rowsToImport=[...checkedIdxs].map(idx=>{
+    const r={...importedRows[idx]};
+    r.category=catSels[idx]||r.category||'その他';
+    return r;
+  });
+  const importNames=new Set(rowsToImport.map(r=>r.name));
+
+  // この証券会社の既存銘柄のうち、今回インポートに含まれないもの（売却済み）を削除
+  const removedCount=holdings.filter(h=>h.broker===importBrokerName&&!importNames.has(h.name)).length;
+  holdings=holdings.filter(h=>h.broker!==importBrokerName||importNames.has(h.name));
+
+  let added=0, updated=0;
+  for(const r of rowsToImport){
+    const existing=holdings.find(h=>h.broker===importBrokerName&&h.name===r.name);
+    if(existing){
+      // 数値系フィールドだけ更新し、horizon/memo/idは保持
+      Object.assign(existing,{
+        qty:r.qty, price:r.price, cost:r.cost,
+        category:r.category, currency:r.currency,
+        ticker:r.ticker, nisa:r.nisa,
+        updatedAt:new Date().toISOString()
+      });
+      updated++;
+    } else {
+      holdings.push({id:uid(),...r,updatedAt:new Date().toISOString()});
+      added++;
+    }
+  }
+  save(); renderAll(); closeImportModal();
+  const parts=[];
+  if(updated) parts.push(`更新 ${updated}件`);
+  if(added)   parts.push(`新規 ${added}件`);
+  if(removedCount) parts.push(`削除 ${removedCount}件`);
+  showToast('✅ '+importBrokerName+': '+parts.join(' / '));
+}
+
+function downloadCustomTemplate() {
+  const header='銘柄名,資産分類,通貨,保有数量,取得単価,現在値,ティッカー,NISA,メモ';
+  const sample=[
+    'eMAXIS Slim 全世界株式,投信：株,JPY,500,18500,22300,,1,つみたてNISA',
+    'Apple Inc.,株,USD,20,165,213,AAPL,,',
+    'Bitcoin,暗号通貨,BTC,0.15,5200000,12200000,BTC-JPY,,',
+    '円預かり金,現金,JPY,500000,,,,,',
+  ];
+  const csv='\uFEFF'+[header,...sample].join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='portfolio_import_template.csv'; a.click();
+  showToast('📄 テンプレートをダウンロードしました');
+}
+
+// ═══════════════════════════════
+//  Export
+// ═══════════════════════════════
+function importJSON(){
+  const input=document.createElement('input');
+  input.type='file'; input.accept='.json';
+  input.onchange=async e=>{
+    const file=e.target.files[0]; if(!file) return;
+    try {
+      const text=await readFileAsText(file,'UTF-8');
+      const data=JSON.parse(text);
+      if(!data.holdings||!Array.isArray(data.holdings)) throw new Error('holdingsが見つかりません');
+      const newH=data.holdings.map(h=>({...h, id:uid(), updatedAt:new Date().toISOString()}));
+      // 同じbrokerの既存データを削除して追加
+      const brokers=[...new Set(newH.map(h=>h.broker))];
+      holdings=holdings.filter(h=>!brokers.includes(h.broker));
+      holdings.push(...newH);
+      save(); renderAll();
+      showToast('✅ '+newH.length+'件を登録しました（'+brokers.join('・')+'）');
+    } catch(e){ showToast('❌ JSONの読み込みに失敗: '+e.message,true); }
+  };
+  input.click();
+}
+
+function exportJSON(){
+  const blob=new Blob([JSON.stringify({holdings,fxRates,targetAlloc},null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='portfolio_backup_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click(); showToast('💾 バックアップ保存');
+}
+
+function exportCSV(){
+  const header=['証券会社','銘柄名','資産分類','通貨','ティッカー','数量','取得単価','現在値','評価額(円)','損益(円)','損益率(%)','NISA','メモ'];
+  const rows=holdings.map(h=>{
+    const valJPY=getValJPY(h),costJPY=getCostJPY(h);
+    const pnl=h.category==='現金'?'':Math.round(valJPY-costJPY);
+    const pnlPct=h.category!=='現金'&&costJPY>0?((valJPY-costJPY)/costJPY*100).toFixed(2):'';
+    return [h.broker,h.name,h.category,h.currency,h.ticker||'',h.qty||'',h.cost||'',h.price||'',Math.round(valJPY),pnl,pnlPct,h.nisa?'○':'',h.memo||''];
+  });
+  const csv='\uFEFF'+[header,...rows].map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='portfolio_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click(); showToast('📄 CSV出力しました');
+}
+
+// ═══════════════════════════════
+//  Toast
+// ═══════════════════════════════
+// ─── スマホ用HTMLエクスポート ───
+function buildMobileHTML() {
+  const data = {
+    holdings:    localStorage.getItem('portfolio_v6'),
+    targets:     localStorage.getItem('portfolio_v6_targets'),
+    watchData:   localStorage.getItem('portfolio_v6_watch'),
+    fxRates:     localStorage.getItem('portfolio_v6_fx'),
+    privacyMode: localStorage.getItem('privacy_mode'),
+  };
+  // JSON内のscript終了タグをエスケープ
+  const safe = JSON.stringify(data).replace(/<\/script>/gi, '<\/scr'+'ipt>');
+  const sc = '<'+'script>';
+  const scEnd = '<'+'/script>';
+  // グローバル変数として埋め込む（iOSのlocalStorage制限を回避）
+  const inject = sc + '\nwindow.__PORTFOLIO_PRELOAD__=' + safe + ';\n' + scEnd;
+  let pageHTML = document.documentElement.outerHTML;
+  pageHTML = pageHTML.replace(/<!--MOBILE_DATA_INJECT-->[\s\S]*?<!--\/MOBILE_DATA_INJECT-->(\n)?/g, '');
+  pageHTML = pageHTML.replace('<head>', '<head>\n<!--MOBILE_DATA_INJECT-->\n' + inject + '\n<!--/MOBILE_DATA_INJECT-->\n');
+  return pageHTML;
+}
+
+async function exportForMobile() {
+  const pageHTML = buildMobileHTML();
+  const date = new Date().toISOString().slice(0, 10);
+  const filename = 'portfolio_' + date + '.html';
+  const blob = new Blob([pageHTML], {type: 'application/octet-stream'});
+
+  if (navigator.canShare) {
+    const file = new File([blob], filename, {type: 'application/octet-stream'});
+    if (navigator.canShare({files: [file]})) {
+      try {
+        await navigator.share({title: 'ポートフォリオ ' + date, files: [file]});
+        showToast('✅ 共有シートを開きました');
+        return;
+      } catch (e) {
+        if (e.name === 'AbortError') return;
+      }
+    }
+  }
+
+  // フォールバック: ダウンロード
+  const htmlBlob = new Blob([pageHTML], {type: 'text/html;charset=utf-8'});
+  const url = URL.createObjectURL(htmlBlob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
+  showToast('✅ ' + filename + ' をダウンロードしました。AirDropでスマホへ送れます。');
+}
+
+function promptFinnhubKey() {
+  const cur = getFinnhubKey();
+  const key = prompt(
+    'Finnhub APIキーを入力してください\n（無料登録: https://finnhub.io ）\n\n未入力で削除します',
+    cur
+  );
+  if(key === null) return; // キャンセル
+  setFinnhubKey(key);
+  const btn = document.getElementById('finnhubBtn');
+  if(btn) btn.style.color = key.trim() ? '#22c55e' : '#f59e0b';
+}
+
+function showToast(msg,isError){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast'+(isError?' error':'');
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ═══════════════════════════════
+//  Render all
+// ═══════════════════════════════
+function activeTab() {
+  const p = document.querySelector('.tab-page.active');
+  return p ? p.id.replace('tab-','') : 'dashboard';
+}
+function renderAll(){
+  renderSummary(); renderCharts(); renderAggTables();
+  renderTargetBars(); renderRanking(); renderBrokerGroups();
+  updateFXDisplay();
+  const tab = activeTab();
+  if(tab==='history') renderHistoryTab();
+  if(tab==='watch')   renderWatchTab();
+  if(tab==='virtual') renderVirtualTab();
+}
+
+// ═══════════════════════════════
+//  Test data & Init
+// ═══════════════════════════════
+const TEST_DATA=[];
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeTargetModal();closeImportModal();}});
+document.getElementById('modalOverlay').addEventListener('click',e=>{if(e.target===document.getElementById('modalOverlay'))closeModal();});
+document.getElementById('targetModalOverlay').addEventListener('click',e=>{if(e.target===document.getElementById('targetModalOverlay'))closeTargetModal();});
+document.getElementById('importModalOverlay').addEventListener('click',e=>{if(e.target===document.getElementById('importModalOverlay'))closeImportModal();});
+
+load();
+if(!holdings.length){
+  holdings=TEST_DATA.map(h=>({...h,updatedAt:new Date().toISOString()}));
+}
+if(!fxRates.USD) fxRates.USD=157.0;
+  if(localStorage.getItem('privacy_mode')==='1'){ privacyMode=true; document.body.classList.add('privacy-mode'); const pb=document.getElementById('privacyBtn'); if(pb) pb.textContent='🙈 金額非表示中'; }
+if(!fxRates.HKD) fxRates.HKD=20.1;
+if(!fxRates.BTC) fxRates.BTC=null;  // 未取得はnullのまま（デフォルト値で誤魔化さない）
+// Finnhubキーが設定済みならボタンを緑色に
+(function(){
+  const btn = document.getElementById('finnhubBtn');
+  if(btn && getFinnhubKey()) btn.style.color = '#22c55e';
+})();
+if(!fxRates.ETH) fxRates.ETH=null;
+if(!fxRates.XRP) fxRates.XRP=null;
+
+renderAll();
+if(localStorage.getItem('portfolio_v6')){
+  document.getElementById('lastUpdated').textContent='最終更新: '+new Date().toLocaleString('ja-JP');
+}
+// 前回のタブを復元
+(()=>{
+  const saved = localStorage.getItem('portfolio_v6_tab');
+  if(saved && saved !== 'dashboard') switchTab(saved);
+})();
+
+// ═══════════════════════════════
+//  仮想トレード
+// ═══════════════════════════════
+let virtualPositions = [];
+const VIRTUAL_KEY = 'portfolio_v6_virtual';
+
+function saveVirtualData() { localStorage.setItem(VIRTUAL_KEY, JSON.stringify(virtualPositions)); }
+function loadVirtualData() {
+  try { const d = localStorage.getItem(VIRTUAL_KEY); if(d) virtualPositions = JSON.parse(d); } catch(e){}
+}
+
+function autoFillVirtualPrices(val) {
+  const price = parseFloat(val);
+  if(!price || price <= 0) return;
+  const tgt = document.getElementById('vTargetPrice');
+  const sl  = document.getElementById('vStopLoss');
+  // 手動で変えていない（空か自動計算値に近い）場合のみ上書き
+  tgt.value = Math.round(price * 1.10);
+  sl.value  = Math.round(price * 0.95);
+}
+
+function openVirtualAddModal(id) {
+  const ov = document.getElementById('virtualModalOverlay');
+  ov.classList.add('open');
+  if(id) {
+    const p = virtualPositions.find(x=>x.id===id);
+    if(!p) return;
+    document.getElementById('vEditId').value = id;
+    document.getElementById('vName').value = p.name||'';
+    document.getElementById('vTicker').value = p.ticker||'';
+    document.getElementById('vCurrency').value = p.currency||'JPY';
+    document.getElementById('vBuyDate').value = p.buyDate||'';
+    document.getElementById('vBuyPrice').value = p.buyPrice||'';
+    document.getElementById('vQty').value = p.qty||'';
+    document.getElementById('vCurrentPrice').value = p.currentPrice||'';
+    document.getElementById('vTargetPrice').value = p.targetPrice||'';
+    document.getElementById('vStopLoss').value = p.stopLoss||'';
+    document.getElementById('vNote').value = p.note||'';
+  } else {
+    document.getElementById('vEditId').value = '';
+    ['vName','vTicker','vBuyDate','vBuyPrice','vQty','vCurrentPrice','vTargetPrice','vStopLoss','vNote'].forEach(id=>{ document.getElementById(id).value=''; });
+    document.getElementById('vCurrency').value = 'JPY';
+    document.getElementById('vBuyDate').value = new Date().toISOString().slice(0,10);
+  }
+}
+function closeVirtualModal() { document.getElementById('virtualModalOverlay').classList.remove('open'); }
+
+function saveVirtualPosition() {
+  const id = document.getElementById('vEditId').value || ('v'+Date.now().toString(36));
+  const buyPrice = parseFloat(document.getElementById('vBuyPrice').value)||0;
+  const pos = {
+    id,
+    name:         document.getElementById('vName').value.trim(),
+    ticker:       document.getElementById('vTicker').value.trim(),
+    currency:     document.getElementById('vCurrency').value,
+    buyDate:      document.getElementById('vBuyDate').value,
+    buyPrice,
+    qty:          parseFloat(document.getElementById('vQty').value)||0,
+    currentPrice: parseFloat(document.getElementById('vCurrentPrice').value)||null,
+    targetPrice:  parseFloat(document.getElementById('vTargetPrice').value)||(buyPrice*1.1),
+    stopLoss:     parseFloat(document.getElementById('vStopLoss').value)||(buyPrice*0.95),
+    note:         document.getElementById('vNote').value.trim(),
+    updatedAt:    new Date().toISOString(),
+  };
+  const idx = virtualPositions.findIndex(x=>x.id===id);
+  if(idx>=0) virtualPositions[idx]=pos; else virtualPositions.push(pos);
+  saveVirtualData(); closeVirtualModal(); renderVirtualTab();
+  showToast('✅ 仮想ポジションを保存しました');
+}
+
+function deleteVirtualPosition(id) {
+  if(!confirm('このポジションを削除しますか？')) return;
+  virtualPositions = virtualPositions.filter(x=>x.id!==id);
+  saveVirtualData(); renderVirtualTab();
+}
+
+function getVirtualStatus(p) {
+  if(!p.currentPrice) return {label:'価格未取得', color:'var(--text-muted)', icon:'⚪'};
+  const pct = (p.currentPrice - p.buyPrice) / p.buyPrice * 100;
+  if(p.currentPrice <= p.stopLoss) return {label:'🔴 損切り検討', color:'var(--danger)', icon:'🔴', pct};
+  if(p.currentPrice >= p.targetPrice) return {label:'🟢 目標達成！', color:'var(--accent)', icon:'🟢', pct};
+  return {label:'🟡 保有継続', color:'#f59e0b', icon:'🟡', pct};
+}
+
+function renderVirtualTab() {
+  const el = document.getElementById('virtualContent');
+  if(!el) return;
+  if(!virtualPositions.length) {
+    el.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:48px 20px">仮想ポジションがありません<br><span style="font-size:12px">「＋ 仮想ポジション追加」から登録してください</span></div>';
+    return;
+  }
+  const fmt = (n,cur) => {
+    if(!n) return '—';
+    if(cur==='USD') return '$'+n.toLocaleString('en-US',{maximumFractionDigits:2});
+    return '¥'+Math.round(n).toLocaleString('ja-JP');
+  };
+  const fmtPct = n => n==null?'—':(n>=0?'+':'')+n.toFixed(2)+'%';
+
+  const rows = virtualPositions.map(p => {
+    const st = getVirtualStatus(p);
+    const pct = st.pct;
+    const totalCost = p.buyPrice * p.qty;
+    const totalNow = p.currentPrice ? p.currentPrice * p.qty : null;
+    const pl = totalNow ? totalNow - totalCost : null;
+    // 目標まで / 損切りまでの進捗バー
+    const range = p.targetPrice - p.stopLoss;
+    const cur = p.currentPrice || p.buyPrice;
+    const prog = Math.min(100, Math.max(0, (cur - p.stopLoss) / range * 100));
+    const barColor = cur <= p.stopLoss ? 'var(--danger)' : cur >= p.targetPrice ? 'var(--accent)' : '#f59e0b';
+
+    return `<div class="watch-card" style="margin-bottom:14px">
+      <div class="watch-card-header">
+        <div>
+          <span style="font-weight:700;font-size:14px">${p.name}</span>
+          <span class="mono" style="font-size:11px;color:var(--text-muted);margin-left:8px">${p.ticker}</span>
+          <span style="font-size:11px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,.07);margin-left:6px">${p.currency}</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:13px;font-weight:700;color:${st.color}">${st.label}</span>
+          <button onclick="openVirtualAddModal('${p.id}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--text-muted)">編集</button>
+          <button onclick="deleteVirtualPosition('${p.id}')" style="background:none;border:1px solid var(--danger);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--danger)">削除</button>
+        </div>
+      </div>
+      <div style="padding:14px 16px">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px">
+          <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">仮想購入価格</div>
+               <div class="mono" style="font-size:14px;font-weight:600">${fmt(p.buyPrice,p.currency)}</div>
+               <div style="font-size:10px;color:var(--text-muted)">${p.qty}株 / ${p.buyDate||'—'}</div></div>
+          <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">現在値</div>
+               <div class="mono" style="font-size:14px;font-weight:600;color:${pct>=0?'var(--accent)':'var(--danger)'}">${fmt(p.currentPrice,p.currency)}</div>
+               <div style="font-size:11px;color:${pct>=0?'var(--accent)':'var(--danger)'};font-weight:600">${fmtPct(pct)}</div></div>
+          <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">損益（仮想）</div>
+               <div class="mono" style="font-size:14px;font-weight:600;color:${pl>=0?'var(--accent)':'var(--danger)'}">${fmt(pl,p.currency)}</div></div>
+          <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">目標 / 損切り</div>
+               <div class="mono" style="font-size:12px">${fmt(p.targetPrice,p.currency)}</div>
+               <div class="mono" style="font-size:12px;color:var(--danger)">${fmt(p.stopLoss,p.currency)}</div></div>
+        </div>
+        <!-- 進捗バー：損切り〜目標 -->
+        <div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-bottom:3px">
+            <span>損切り ${fmt(p.stopLoss,p.currency)}</span><span>目標 ${fmt(p.targetPrice,p.currency)}</span>
+          </div>
+          <div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:${prog}%;background:${barColor};border-radius:3px;transition:width .3s"></div>
+          </div>
+        </div>
+        ${p.note?`<div style="font-size:11px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:8px">📝 ${p.note}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // サマリー行
+  const total = virtualPositions.length;
+  const st_ok = virtualPositions.filter(p=>{ const s=getVirtualStatus(p); return s.icon==='🟡'; }).length;
+  const st_target = virtualPositions.filter(p=>{ const s=getVirtualStatus(p); return s.icon==='🟢'; }).length;
+  const st_stop = virtualPositions.filter(p=>{ const s=getVirtualStatus(p); return s.icon==='🔴'; }).length;
+  const summary = `<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+    <div class="watch-stat" style="flex:1;min-width:120px"><div class="watch-stat-label">ポジション数</div><div class="watch-stat-val">${total}</div></div>
+    <div class="watch-stat" style="flex:1;min-width:120px"><div class="watch-stat-label">🟡 保有継続</div><div class="watch-stat-val" style="color:#f59e0b">${st_ok}</div></div>
+    <div class="watch-stat" style="flex:1;min-width:120px"><div class="watch-stat-label">🟢 目標達成</div><div class="watch-stat-val" style="color:var(--accent)">${st_target}</div></div>
+    <div class="watch-stat" style="flex:1;min-width:120px"><div class="watch-stat-label">🔴 損切り検討</div><div class="watch-stat-val" style="color:var(--danger)">${st_stop}</div></div>
+  </div>`;
+  el.innerHTML = summary + rows;
+}
+
+async function fetchVirtualPrices() {
+  if(!virtualPositions.length) { showToast('⚠️ 仮想ポジションがありません', true); return; }
+  const btn = document.getElementById('virtualPriceBtn');
+  if(btn) { btn.textContent='⏳ 取得中...'; btn.classList.add('btn-loading'); }
+  const targets = virtualPositions.filter(p=>p.ticker);
+  let ok=0, fail=0;
+  await Promise.all(targets.map(async p => {
+    const sym = toYahooSymbol({ticker:p.ticker, currency:p.currency});
+    if(!sym) { fail++; return; }
+    const isUS = p.currency==='USD' && !/^\d/.test(sym);
+    let price = null;
+    if(isUS && getFinnhubKey()) price = await finnhubFetch(sym);
+    if(price===null) price = await yahooFetch(sym);
+        if(price!==null) { p.currentPrice=price; p.updatedAt=new Date().toISOString(); ok++; }
+    else fail++;
+  }));
+  saveVirtualData(); renderVirtualTab();
+  if(btn) { btn.textContent='📡 株価更新'; btn.classList.remove('btn-loading'); }
+  showToast(fail>0 ? `✅ ${ok}件更新 / ⚠️ ${fail}件失敗` : `✅ ${ok}件すべて更新`);
+}
+
+// ═══════════════════════════════════
+//  Coworkインポート
+// ═══════════════════════════════════
+async function importFromClipboard() {
+  const btn = document.getElementById('coworkPasteBtn');
+  if(btn) btn.textContent = '⏳ 読み込み中...';
+  try {
+    const text = await navigator.clipboard.readText();
+    if(!text || !text.trim()) {
+      showToast('⚠️ クリップボードが空です', true);
+      if(btn) btn.textContent = '📋 Coworkから貼り付け';
+      return;
+    }
+    let data;
+    try { data = JSON.parse(text.trim()); } catch(e) {
+      showToast('❌ クリップボードの内容がJSONではありません', true);
+      if(btn) btn.textContent = '📋 Coworkから貼り付け';
+      return;
+    }
+    processCoworkImport(data);
+  } catch(e) {
+    // クリップボード権限が拒否された場合はファイル選択にフォールバック
+    showToast('⚠️ クリップボードへのアクセスが拒否されました。📁 JSONボタンをお使いください', true);
+  }
+  if(btn) btn.textContent = '📋 Coworkから貼り付け';
+}
+
+function importFromCowork(input) {
+  const file = input.files[0];
+  if(!file) return;
+  input.value = '';
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    let data;
+    try { data = JSON.parse(e.target.result); } catch(err) {
+      showToast('❌ JSONの読み込みに失敗しました', true); return;
+    }
+    processCoworkImport(data);
+  };
+  reader.readAsText(file);
+}
+
+function processCoworkImport(data) {
+  if(!data || typeof data !== 'object') { showToast('❌ 不正なデータ形式', true); return; }
+  let added = 0, updated = 0, skipped = 0;
+  const now = new Date().toISOString();
+  const src = data.source || 'cowork';
+  const srcDate = data.updatedAt ? data.updatedAt.slice(0,10) : now.slice(0,10);
+  const memo = `[${src} ${srcDate}]`;
+
+  const positions = data.virtualPositions || [];
+  positions.forEach(item => {
+    if(!item.ticker) { skipped++; return; }
+    const ticker = item.ticker.toUpperCase();
+    const existing = virtualPositions.find(p => p.ticker.toUpperCase() === ticker);
+    if(existing) {
+      if(item.currentPrice != null) { existing.currentPrice = item.currentPrice; existing.updatedAt = now; }
+      if(item.buyPrice    != null) existing.buyPrice    = item.buyPrice;
+      if(item.targetPrice != null) existing.targetPrice = item.targetPrice;
+      if(item.stopLoss    != null) existing.stopLoss    = item.stopLoss;
+      if(item.shares      != null) existing.shares      = item.shares;
+      if(item.memo        != null) existing.memo        = item.memo;
+      if(item.name        != null) existing.name        = item.name;
+      if(item.status      != null) existing.status      = item.status;
+      updated++;
+    } else {
+      virtualPositions.push({
+        id:           Date.now() + Math.random(),
+        ticker:       ticker,
+        name:         item.name        || ticker,
+        currency:     item.currency    || 'USD',
+                shares:       item.shares      || 0,
+        buyPrice:     item.buyPrice    || 0,
+        currentPrice: item.currentPrice|| null,
+        targetPrice:  item.targetPrice || 0,
+        stopLoss:     item.stopLoss    || 0,
+        memo:         item.memo        || memo,
+        status:       item.status      || 'watching',
+        addedAt:      now,
+        updatedAt:    item.currentPrice ? now : null,
+      });
+      added++;
+    }
+  });
+
+  const watchItems = data.watchList || [];
+  watchItems.forEach(item => {
+    if(!item.ticker) return;
+    const ticker = item.ticker.toUpperCase();
+    if(!watchData.find(w => w.ticker === ticker)) {
+      watchData.push({ ticker, name: item.name||ticker, currency: item.currency||'USD', memo: item.memo||memo });
+    }
+  });
+  if(watchItems.length > 0) saveWatchData();
+
+  saveVirtualData();
+  renderVirtualTab();
+
+  const parts = [];
+  if(added)   parts.push(`${added}件追加`);
+  if(updated) parts.push(`${updated}件更新`);
+  if(skipped) parts.push(`${skipped}件スキップ`);
+  const watchMsg = watchItems.length ? ` / ウォッチ${watchItems.length}件` : '';
+  showToast(`📥 インポート完了: ${parts.join('、') || '変更なし'}${watchMsg}`);
+}
+
+</script>
+</body>
+</html>
