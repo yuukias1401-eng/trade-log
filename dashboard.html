@@ -253,6 +253,7 @@ tr.h-short td:first-child { border-left:3px solid #f87171; }
   <div class="header-actions">
     <button class="btn btn-ghost" onclick="exportCSV()">📄 CSV出力</button>
     <button class="btn btn-ghost" onclick="exportJSON()">💾 バックアップ</button>
+    <button class="btn btn-ghost" onclick="restoreJSON()">📂 復元</button>
     <button class="btn btn-ghost" onclick="takeSnapshot()">📈 推移グラフ更新</button>
     <button class="btn btn-secondary" onclick="openImportModal()">📥 CSVインポート</button>
     <button class="btn btn-primary" onclick="openModal()">＋ 銘柄追加</button>
@@ -3012,6 +3013,26 @@ function importJSON(){
       save(); renderAll();
       showToast('✅ '+newH.length+'件を登録しました（'+brokers.join('・')+'）');
     } catch(e){ showToast('❌ JSONの読み込みに失敗: '+e.message,true); }
+  };
+  input.click();
+}
+
+function restoreJSON(){
+  if(!confirm('バックアップJSONから完全復元します。\n現在のデータはすべて上書きされます。よろしいですか？')) return;
+  const input=document.createElement('input');
+  input.type='file'; input.accept='.json';
+  input.onchange=async e=>{
+    const file=e.target.files[0]; if(!file) return;
+    try {
+      const text=await readFileAsText(file,'UTF-8');
+      const data=JSON.parse(text);
+      if(!data.holdings||!Array.isArray(data.holdings)) throw new Error('holdingsが見つかりません');
+      holdings=data.holdings;
+      if(data.fxRates) fxRates={...fxRates,...data.fxRates};
+      if(data.targetAlloc) targetAlloc=data.targetAlloc;
+      save(); renderAll();
+      showToast('✅ 復元完了（'+holdings.length+'件）');
+    } catch(e){ showToast('❌ 復元に失敗: '+e.message,true); }
   };
   input.click();
 }
