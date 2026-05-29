@@ -774,6 +774,20 @@ window._fbSyncWatchlist = async function(h) {
   } catch(e) { console.warn('Watchlist sync failed:', e); }
 };
 
+// 短期タグ銘柄を一括でwatchlistに同期
+window._syncAllShortToWatchlist = async function() {
+  if (!window._fbReady) return;
+  var shorts = (holdings || []).filter(function(h) { return h.horizon === 'short'; });
+  if (!shorts.length) return;
+  console.log('短期銘柄を一括同期中: ' + shorts.length + '件');
+  await Promise.all(shorts.map(function(h) {
+    return window._fbSyncWatchlist(h).catch(function(e) {
+      console.warn('watchlist sync failed for ' + h.name, e);
+    });
+  }));
+  console.log('短期銘柄の同期完了');
+};
+
 window._fbInit = async function() {
   try {
     var snap = await window._db.collection('holdings').limit(1).get();
@@ -783,6 +797,8 @@ window._fbInit = async function() {
       await window._fbSaveHoldings();
       console.log('Migration complete!');
     }
+    // 起動時に短期銘柄を一括同期
+    await window._syncAllShortToWatchlist();
   } catch(e) {
     console.warn('Firestore unavailable, localStorage only:', e);
     window._fbReady = false;
@@ -3031,7 +3047,10 @@ function restoreJSON(){
       if(data.fxRates) fxRates={...fxRates,...data.fxRates};
       if(data.targetAlloc) targetAlloc=data.targetAlloc;
       save(); renderAll();
-      showToast('✅ 復元完了（'+holdings.length+'件）');
+      // 復元後に短期銘柄をwatchlistに一括同期
+      await window._syncAllShortToWatchlist();
+      const shortCount = holdings.filter(h=>h.horizon==='short').length;
+      showToast('✅ 復元完了（'+holdings.length+'件）' + (shortCount ? ' / 短期'+shortCount+'件をトレードログに同期' : ''));
     } catch(e){ showToast('❌ 復元に失敗: '+e.message,true); }
   };
   input.click();
