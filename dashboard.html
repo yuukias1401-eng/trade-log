@@ -444,11 +444,21 @@ tr.h-short td:first-child { border-left:3px solid #f87171; }
 <div class="main">
   <div class="section-header" style="margin-bottom:16px">
     <div class="section-title">🔴 ウォッチリスト <span style="font-size:12px;font-weight:400;color:var(--text-muted)">短期タグの銘柄</span></div>
-    <div style="display:flex;gap:8px;align-items:center">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <div id="watchSummary" style="font-size:12px;color:var(--text-muted)"></div>
       <button class="btn btn-ghost" id="shortPriceBtn2" onclick="fetchShortPricesWatch()" style="font-size:11px;padding:4px 10px;color:#f87171;border-color:#f87171;">🔴 株価更新</button>
       <button class="btn btn-ghost" onclick="fetchShortPricesWatch(true)" style="font-size:11px;padding:4px 10px;color:#a78bfa;border-color:#a78bfa;">⬜ 未取得のみ</button>
     </div>
+  </div>
+  <!-- ポジションサイズ計算機 -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.7px">📐 ポジションサイズ</span>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:12px;color:var(--text-muted)">1トレード最大リスク</span>
+      <input type="number" id="riskPctInput" value="2" min="0.1" max="10" step="0.1" style="width:60px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 7px;font-size:12px;font-family:'DM Mono',monospace" oninput="renderWatchTab()">
+      <span style="font-size:12px;color:var(--text-muted)">%</span>
+    </div>
+    <span style="font-size:11px;color:var(--text-muted)">総資産 × リスク% ÷ 損切幅 = 最大株数</span>
   </div>
   <div id="watchContent"></div>
 </div>
@@ -461,6 +471,14 @@ tr.h-short td:first-child { border-left:3px solid #f87171; }
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <div class="modal-title" id="modalTitle">銘柄を追加</div>
+    <!-- TradingView チャート（折りたたみ） -->
+    <div style="margin-bottom:16px" id="tvSection" style="display:none">
+      <button onclick="toggleTVChart()" class="btn btn-ghost" id="tvToggleBtn" style="font-size:11px;width:100%;text-align:left">📊 TradingViewチャートを表示</button>
+      <div id="tvChartWrap" style="display:none;margin-top:8px;border-radius:8px;overflow:hidden;background:#131722">
+        <iframe id="tvChartFrame" src="" width="100%" height="320" frameborder="0" scrolling="no" style="display:block"></iframe>
+        <div id="tvChartInfo" style="padding:10px 14px;font-size:12px;font-family:'DM Mono',monospace;color:var(--text-muted);line-height:1.8"></div>
+      </div>
+    </div>
     <div class="form-grid">
       <div class="form-group">
         <label class="form-label">証券会社 *</label>
@@ -703,17 +721,28 @@ window.googleSignIn  = function() { window._auth.signInWithPopup(window._googleP
 window.googleSignOut = function() { window._auth.signOut(); };
 
 window._fbReady = false;
+window._uid = null;
 
 window._fbSaveHoldings = async function() {
-  if (!window._fbReady || !holdings || !holdings.length) return;
+  if (!window._fbReady || !window._uid) return;
   try {
-    var col = window._db.collection('holdings');
+    var userRef = window._db.collection('users').doc(window._uid);
+    var col = userRef.collection('holdings');
+    // 現在holdingsにないドキュメントを削除
+    var existing = await col.get();
+    var ids = holdings.map(function(h){ return String(h.id); });
+    var delBatch = window._db.batch();
+    existing.docs.forEach(function(d){ if(ids.indexOf(d.id)<0) delBatch.delete(d.ref); });
+    await delBatch.commit();
+    // holdings保存
     for (var i = 0; i < holdings.length; i += 400) {
       var batch = window._db.batch();
       holdings.slice(i, i+400).forEach(function(h) { batch.set(col.doc(String(h.id)), h); });
       await batch.commit();
     }
-  } catch(e) { console.warn('Firestore holdings save failed:', e); }
+    // fxRates・targetAllocも保存（スマホ同期用）
+    await userRef.set({ fxRates: fxRates, targetAlloc: targetAlloc, updatedAt: Date.now() }, { merge: true });
+  } catch(e) { console.warn('Firestore save failed:', e); }
 };
 
 window._fbSyncWatchlist = async function(h) {
@@ -769,12 +798,35 @@ window._syncAllShortToWatchlist = async function() {
 
 window._fbInit = async function() {
   try {
-    console.log('[Firebase] 接続テスト中...');
-    // watchlistコレクションで疎通確認（holdingsはセキュリティルール対象外の可能性あり）
-    await window._db.collection('watchlist').limit(1).get();
+    var user = window._auth.currentUser;
+    if (!user) return;
+    window._uid = user.uid;
     window._fbReady = true;
-    console.log('[Firebase] 接続成功 ✅');
-    // 起動時に短期銘柄を一括同期
+    console.log('[Firebase] 接続成功 ✅ uid:', window._uid);
+
+    var userRef = window._db.collection('users').doc(window._uid);
+    var results = await Promise.all([userRef.collection('holdings').get(), userRef.get()]);
+    var holdSnap = results[0], metaSnap = results[1];
+
+    if (!holdSnap.empty) {
+      // Firestoreにデータあり → 優先採用（PC↔スマホ同期）
+      var fbHoldings = holdSnap.docs.map(function(d){ return d.data(); });
+      if (fbHoldings.length > 0) {
+        holdings = fbHoldings;
+        if (metaSnap.exists) {
+          var meta = metaSnap.data();
+          if (meta.fxRates) fxRates = Object.assign({}, fxRates, meta.fxRates);
+          if (meta.targetAlloc) targetAlloc = meta.targetAlloc;
+        }
+        localStorage.setItem('portfolio_v6', JSON.stringify(holdings));
+        renderAll();
+        console.log('[Firebase] Firestoreからデータ復元: ' + fbHoldings.length + '件');
+      }
+    } else if (holdings && holdings.length > 0) {
+      // Firestore空・ローカルにデータあり → 移行
+      console.log('[Firebase] ローカルデータをFirestoreに移行中...');
+      await window._fbSaveHoldings();
+    }
     await window._syncAllShortToWatchlist();
   } catch(e) {
     console.error('[Firebase] 接続失敗 ❌:', e.code, e.message, e);
@@ -854,6 +906,12 @@ function renderWatchTab() {
       const rem = (parseFloat(nowPct) - parseFloat(tgtDown)).toFixed(1);
       downRemain = `<span style="font-size:10px;color:var(--danger);margin-left:3px">あと${rem}%</span>`;
     }
+    // RR比（リスクリワード）
+    const rrNum = tgtUp && tgtDown && parseFloat(tgtDown) !== 0
+      ? parseFloat(tgtUp) / Math.abs(parseFloat(tgtDown)) : null;
+    const rrBadge = rrNum !== null
+      ? `<span style="font-size:10px;padding:1px 6px;border-radius:8px;font-weight:700;background:${rrNum>=2?'rgba(74,222,154,.15)':rrNum>=1?'rgba(245,158,11,.15)':'rgba(248,113,113,.15)'};color:${rrNum>=2?'var(--accent)':rrNum>=1?'#f59e0b':'var(--danger)'}">RR ${rrNum.toFixed(1)}</span>`
+      : '';
 
     const url = chartUrl(h);
     const chartBtn = url
@@ -880,8 +938,8 @@ function renderWatchTab() {
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           ${chartBtn}
           <div>
-            <div style="font-weight:500;display:flex;align-items:center;gap:5px">
-              ${h.name} ${alertBadge}
+            <div style="font-weight:500;display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+              ${h.name} ${alertBadge} ${rrBadge}
             </div>
             <div style="font-size:10px;color:var(--text-muted)">${h.broker}${h.ticker?' · '+h.ticker:''}</div>
             <div style="font-size:12px;color:var(--text-muted);margin-top:3px;font-family:'DM Mono',monospace">
@@ -915,6 +973,16 @@ function renderWatchTab() {
         <input class="watch-input watch-memo" type="text" placeholder="メモ..." value="${memo}"
           onchange="setWatchField('${h.id}','memo',this.value)">
       </td>
+      <td class="text-right mono" style="font-size:11px;color:var(--accent2)">${(()=>{
+        const riskPct = parseFloat(document.getElementById('riskPctInput')?.value||'2');
+        const totalAll = holdings.reduce((s,hh)=>s+getValJPY(hh),0);
+        const maxLoss = totalAll * riskPct / 100;
+        const cost = parseFloat(h.cost)||0;
+        if(!cost || !tgtDown || parseFloat(tgtDown)===0) return '—';
+        const lossPerShare = cost * Math.abs(parseFloat(tgtDown)) / 100;
+        const maxShares = Math.floor(maxLoss / lossPerShare);
+        return maxShares > 0 ? maxShares + '株' : '—';
+      })()}</td>
     </tr>`;
   }).join('');
 
@@ -940,6 +1008,7 @@ function renderWatchTab() {
             <th>📈 利確目標%</th>
             <th>🛑 損切ライン%</th>
             <th>メモ</th>
+            <th class="text-right">最大株数</th>
           </tr></thead>
           <tbody>${makeRows(items)}</tbody>
         </table>
@@ -1718,6 +1787,13 @@ function openModal(id) {
   document.getElementById('f-memo').value=h?.memo||'';
   document.getElementById('f-nisa').checked=h?.nisa||false;
   onCategoryChange(); updateCalc();
+  // TVチャートリセット
+  const tvSec = document.getElementById('tvSection');
+  if(tvSec) tvSec.style.display = editingId ? 'block' : 'none';
+  document.getElementById('tvChartWrap').style.display = 'none';
+  document.getElementById('tvToggleBtn').textContent = '📊 TradingViewチャートを表示';
+  document.getElementById('tvChartFrame').src = '';
+  document.getElementById('tvChartInfo').innerHTML = '';
   document.getElementById('modalOverlay').classList.add('open');
   setTimeout(()=>document.getElementById('f-broker').focus(),80);
 }
@@ -3118,6 +3194,97 @@ function showToast(msg,isError){
 }
 
 // ═══════════════════════════════
+//  TradingView チャート
+// ═══════════════════════════════
+function toTVSymbol(h) {
+  const t = (h.ticker || '').trim();
+  if (!t) return null;
+  const cur = (h.currency || 'JPY').toUpperCase();
+  if (cur === 'JPY' && /^\d{4,5}$/.test(t)) return 'TSE:' + t;
+  if (cur === 'HKD') return 'HKEX:' + t.replace(/^0+/, '');
+  return t; // USD等はそのまま（TradingViewが自動判別）
+}
+
+function toggleTVChart() {
+  const wrap = document.getElementById('tvChartWrap');
+  const btn  = document.getElementById('tvToggleBtn');
+  const open = wrap.style.display === 'none';
+  wrap.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? '📊 チャートを閉じる' : '📊 TradingViewチャートを表示';
+  if (open && editingId) {
+    const h = holdings.find(x => x.id === editingId);
+    if (!h) return;
+    const sym = toTVSymbol(h);
+    if (sym) {
+      document.getElementById('tvChartFrame').src =
+        'https://s.tradingview.com/widgetsnippet/?symbol=' + encodeURIComponent(sym) +
+        '&interval=D&theme=dark&style=1&locale=ja&hide_top_toolbar=0&hide_legend=1&save_image=0';
+      const buyDate = h.updatedAt ? h.updatedAt.slice(0,10) : '—';
+      const valJPY  = getValJPY(h);
+      const costJPY = getCostJPY(h);
+      const pnl     = valJPY - costJPY;
+      const pnlPct  = costJPY > 0 ? (pnl/costJPY*100).toFixed(2) : null;
+      document.getElementById('tvChartInfo').innerHTML =
+        `取得単価: ${h.cost ? fmtCost(parseFloat(h.cost)) : '—'} ${h.currency} ／ 現在値: ${h.price ? fmtCost(parseFloat(h.price)) : '—'} ${h.currency}` +
+        (pnlPct !== null ? ` ／ 含み損益: <span style="color:${pnl>=0?'var(--accent)':'var(--danger)'}">${pnl>=0?'+':''}${pnlPct}%</span>` : '');
+    }
+  }
+}
+
+// ═══════════════════════════════
+//  株価アラート（ブラウザ通知）
+// ═══════════════════════════════
+const _alertFired = {};
+
+function checkPriceAlerts() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const shorts = holdings.filter(h => h.horizon === 'short' && h.category !== '現金');
+  shorts.forEach(h => {
+    const wd = watchData[h.id] || {};
+    const tgtUp   = wd.tgtUp   ? parseFloat(wd.tgtUp)   : null;
+    const tgtDown = wd.tgtDown ? parseFloat(wd.tgtDown) : null;
+    const costJPY = getCostJPY(h);
+    const valJPY  = getValJPY(h);
+    if (!costJPY) return;
+    const pnlPct = (valJPY - costJPY) / costJPY * 100;
+    if (tgtUp !== null && pnlPct >= tgtUp && !_alertFired[h.id+'_up']) {
+      _alertFired[h.id+'_up'] = true;
+      new Notification('🔔 利確ライン到達！', { body: `${h.name}: +${pnlPct.toFixed(1)}%（目標 +${tgtUp}%）` });
+    } else if (tgtUp !== null && pnlPct < tgtUp) {
+      delete _alertFired[h.id+'_up'];
+    }
+    if (tgtDown !== null && pnlPct <= tgtDown && !_alertFired[h.id+'_down']) {
+      _alertFired[h.id+'_down'] = true;
+      new Notification('🚨 損切りライン！', { body: `${h.name}: ${pnlPct.toFixed(1)}%（損切り ${tgtDown}%）` });
+    } else if (tgtDown !== null && pnlPct > tgtDown) {
+      delete _alertFired[h.id+'_down'];
+    }
+  });
+}
+
+async function silentFetchShortPrices() {
+  const wt = holdings.filter(h => h.ticker && h.horizon === 'short');
+  if (!wt.length) return;
+  await Promise.all(wt.map(async h => {
+    const sym = toYahooSymbol(h);
+    if (!sym) return;
+    const p = await yahooFetch(sym);
+    if (p !== null) { h.price = p; }
+  }));
+  save(); renderAll();
+}
+
+function startAlertPolling() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+  setInterval(async () => {
+    await silentFetchShortPrices();
+    checkPriceAlerts();
+  }, 5 * 60 * 1000);
+}
+
+// ═══════════════════════════════
 //  Render all
 // ═══════════════════════════════
 function activeTab() {
@@ -3176,6 +3343,9 @@ window._auth.onAuthStateChanged(function(user) {
   const saved = localStorage.getItem('portfolio_v6_tab');
   if(saved && saved !== 'dashboard') switchTab(saved);
 })();
+
+// 株価アラートポーリング開始（5分ごと）
+startAlertPolling();
 
 
 </script>
