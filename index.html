@@ -1076,10 +1076,22 @@ window.toggleChart = (id) => {
     if (!s) return;
     const sym = toTVSymbol(s.code ?? s.ticker ?? '', s.currency);
     if (sym) {
-      wrap.innerHTML = `<iframe
-        src="https://s.tradingview.com/embed-widget/mini-symbol-overview/?locale=ja#{"symbol":"${sym}","width":"100%","height":220,"dateRange":"3M","colorTheme":"dark","trendLineColor":"rgba(74,222,154,1)","underLineColor":"rgba(74,222,154,0.08)","isTransparent":true,"autosize":true}"
-        width="100%" height="220" frameborder="0" scrolling="no"
-        style="display:block;border-radius:8px"></iframe>`;
+      // innerHTML内でJSON的な"を使うとHTML属性が壊れるため、createElement経由でsrcをセット
+      const cfg = JSON.stringify({
+        symbol: sym, width: '100%', height: 220,
+        dateRange: '3M', colorTheme: 'dark',
+        trendLineColor: 'rgba(74,222,154,1)',
+        underLineColor: 'rgba(74,222,154,0.08)',
+        isTransparent: true, autosize: true
+      });
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://s.tradingview.com/embed-widget/mini-symbol-overview/?locale=ja#${cfg}`;
+      iframe.width = '100%';
+      iframe.height = '220';
+      iframe.frameBorder = '0';
+      iframe.scrolling = 'no';
+      iframe.style.cssText = 'display:block;border-radius:8px';
+      wrap.appendChild(iframe);
     } else {
       wrap.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">銘柄コードを登録するとチャートが表示されます</div>`;
     }
@@ -1108,49 +1120,77 @@ function render() {
     const fromDash = s.fromDashboard === true;
     const url=chartUrl(stockCode);
 
-    // ゲージバー計算（オーバーフロー対応版）
-    let gaugeHTML='';
-    if(s.loss && s.target){
-      const lo=s.loss, hi=s.target, cur=currentPrice;
-      const range=hi-lo;
-      const rawPct = range > 0 ? (cur-lo)/range*100 : 0;
-      const buyRawPct = range > 0 ? (buyPrice-lo)/range*100 : 0;
+    // ── ゲージバー（履歴対応・点線＋実線 2重表示）──
+    let gaugeHTML = '';
+    if (s.loss && s.target) {
+      const lo  = s.loss, hi = s.target;
+      const cur = currentPrice, buy = buyPrice;
+      const hasAdj   = s.adjustments && s.adjustments.length > 0;
 
-      // fillは0〜100%（トラック内）で完結。markerだけ突き抜けOK
-      const fillPct   = Math.min(Math.max(rawPct, 0), 100);
-      const markerPct = Math.min(Math.max(rawPct, -2), 118); // 〜118%まで許容
-      const buyMarkerPct = Math.min(Math.max(buyRawPct, 1), 99);
+      // 元ライン（最初の引き上げ前 = 購入時の設定値）
+      const origLo   = hasAdj ? (s.adjustments[0].prevLoss   ?? lo) : lo;
+      const origHi   = hasAdj ? (s.adjustments[0].prevTarget ?? hi) : hi;
+      const showGhost = hasAdj && (Math.abs(origLo - lo) > 1 || Math.abs(origHi - hi) > 1);
 
-      const isPastTarget = rawPct >= 100;
-      const isBelowLoss  = rawPct <= 0;
-      const showBuyMark  = buyRawPct > 3 && buyRawPct < 97; // 買値マーカー表示
+      // 座標空間: 元ライン+現ラインを両方カバー
+      const cMin = Math.min(origLo, lo);
+      const cMax = Math.max(origHi, hi);
+      const cRange = cMax - cMin;
+      const p = v => cRange > 0 ? (v - cMin) / cRange * 100 : 50;
 
-      const toTargetAbs = Math.abs((hi-cur)/Math.abs(cur)*100).toFixed(1);
-      const toLossAbs   = Math.abs((cur-lo)/Math.abs(cur)*100).toFixed(1);
+      const solidL = Math.max(0, p(lo));
+      const solidW = Math.max(0, Math.min(p(hi) - solidL, 100 - solidL));
+      const ghostL = Math.max(0, p(origLo));
+      const ghostW = Math.max(0, Math.min(p(origHi) - ghostL, 100 - ghostL));
 
-      const rightLabel = isPastTarget
-        ? `<span style="color:var(--green);font-weight:700">目標超過 +${toTargetAbs}% 🎯</span>`
-        : `<span style="color:var(--blue)">目標まで +${toTargetAbs}%</span>`;
-      const leftLabel = isBelowLoss
-        ? `<span style="color:var(--red);font-weight:700">損切超過 ⚠️</span>`
-        : `<span style="color:var(--red)">損切まで -${toLossAbs}%</span>`;
+      // 現在値マーカー: 目標を最大+18pp超まで表示OK
+      const markerP = Math.min(Math.max(p(cur), solidL - 2), p(hi) + 18);
+      const buyP    = Math.min(Math.max(p(buy), 1), 99);
 
-      const alertHTML = isPastTarget
-        ? `<div class="alert-badge alert-win">🔔 目標到達！引き上げを検討</div>`
-        : isBelowLoss ? `<div class="alert-badge alert-lose">🚨 損切ライン割れ！</div>` : '';
+      const isPast = cur >= hi;
+      const isLoss = cur <= lo;
 
-      const fillStyle = isPastTarget
+      // 購入価格からの%（ラベル用）
+      const fmtP = (v) => buy > 0 ? ((v - buy) / buy * 100).toFixed(0) : '0';
+      const origLoPct = fmtP(origLo); // e.g. "-5"
+      const origHiPct = fmtP(origHi); // e.g. "10"
+      const curLoPct  = fmtP(lo);
+      const curHiPct  = fmtP(hi);
+
+      const fillStyle = isPast
         ? 'background:var(--green);box-shadow:0 0 8px rgba(74,222,154,.5)'
         : 'background:linear-gradient(90deg,var(--red),var(--green))';
 
-      gaugeHTML=`
+      const alertHTML = isPast
+        ? `<div class="alert-badge alert-win">🔔 目標到達！引き上げを検討</div>`
+        : isLoss ? `<div class="alert-badge alert-lose">🚨 損切ライン割れ！</div>` : '';
+
+      // ラベル（showGhost時は購入時+現在の2行）
+      const leftLabel = showGhost
+        ? `<div style="font-size:11px;color:var(--red);line-height:1.6">
+            <span style="opacity:.5;font-size:10px">${origLoPct}% 損切（購入時）</span><br>
+            <b>${curLoPct}% 損切（現在）</b></div>`
+        : `<span style="font-size:11px;font-weight:600;color:var(--red)">${origLoPct}% 損切</span>`;
+
+      const rightLabel = showGhost
+        ? `<div style="font-size:11px;color:${isPast?'var(--green)':'var(--blue)'};text-align:right;line-height:1.6">
+            <span style="opacity:.5;font-size:10px">+${origHiPct}% 目標（購入時）</span><br>
+            <b>${isPast ? '超過🎯' : `+${curHiPct}% 目標（現在）`}</b></div>`
+        : `<span style="font-size:11px;font-weight:600;color:${isPast?'var(--green)':'var(--blue)'}">${isPast ? '超過🎯' : `+${origHiPct}% 目標`}</span>`;
+
+      gaugeHTML = `
         ${alertHTML}
         <div class="gauge-wrap">
-          <div class="gauge-labels"><span style="color:var(--red)">損切 ¥${lo.toLocaleString()}</span><span style="color:var(--blue)">目標 ¥${hi.toLocaleString()}</span></div>
+          <div class="gauge-labels">
+            <span style="color:var(--red)">損切 ¥${lo.toLocaleString()}</span>
+            <span style="color:var(--blue)">目標 ¥${hi.toLocaleString()}</span>
+          </div>
           <div class="gauge-track">
-            <div class="gauge-fill" style="width:${fillPct}%;${fillStyle}"></div>
-            ${showBuyMark?`<div style="position:absolute;top:-3px;left:${buyMarkerPct}%;width:2px;height:14px;background:var(--muted);border-radius:1px;transform:translateX(-50%);opacity:.6" title="購入価格 ¥${buyPrice.toLocaleString()}"></div>`:''}
-            <div class="gauge-marker" style="left:${markerPct}%;background:${isPastTarget?'var(--green)':'white'}"></div>
+            ${showGhost ? `<div style="position:absolute;top:0;left:${ghostL.toFixed(1)}%;width:${ghostW.toFixed(1)}%;height:100%;border-radius:4px;
+              background:repeating-linear-gradient(90deg,rgba(255,255,255,.2) 0,rgba(255,255,255,.2) 3px,transparent 3px,transparent 7px)"></div>` : ''}
+            <div style="position:absolute;top:0;left:${solidL.toFixed(1)}%;width:${solidW.toFixed(1)}%;height:100%;border-radius:4px;${fillStyle}"></div>
+            <div style="position:absolute;top:-3px;left:${buyP.toFixed(1)}%;width:2px;height:14px;background:var(--muted);border-radius:1px;transform:translateX(-50%);opacity:.55" title="購入価格 ¥${buy.toLocaleString()}"></div>
+            <div class="gauge-marker" style="left:${markerP.toFixed(1)}%;background:${isPast?'var(--green)':'white'}"></div>
           </div>
           <div class="gauge-remain">${leftLabel}${rightLabel}</div>
         </div>`;
