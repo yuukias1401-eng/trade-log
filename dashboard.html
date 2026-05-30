@@ -1129,8 +1129,7 @@ function aggByJPY(key) {
 //  FX Fetch
 // ═══════════════════════════════
 const PROXIES = [
-  u=>u,  // 直接アクセス
-  u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  u=>u,  // 直接アクセスのみ
 ];
 
 // タイムアウト付きfetch
