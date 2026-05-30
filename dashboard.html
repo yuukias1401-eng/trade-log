@@ -1129,11 +1129,8 @@ function aggByJPY(key) {
 //  FX Fetch
 // ═══════════════════════════════
 const PROXIES = [
-  u=>u,  // 直接アクセス（CORS許可されていれば最速）
+  u=>u,  // 直接アクセス
   u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-  u=>`https://thingproxy.freeboard.io/fetch/${u}`,
 ];
 
 // タイムアウト付きfetch
