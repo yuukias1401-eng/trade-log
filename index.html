@@ -378,13 +378,14 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 
 <button class="fab" onclick="openAddModal()" title="銘柄を追加">＋</button>
 
-<!-- 詳細モーダル -->
+<!-- 詳細・編集モーダル -->
 <div class="modal" id="detailModal">
   <div class="modal-inner">
-    <div class="modal-title" id="modal-title">詳細</div>
+    <div class="modal-title" id="modal-title">詳細・編集</div>
     <div id="modal-body"></div>
     <div class="modal-footer">
       <button class="btn btn-sm btn-ghost" onclick="closeModal()">閉じる</button>
+      <button class="btn btn-primary" style="width:auto;padding:10px 24px;" onclick="saveStockDetail()">💾 保存</button>
     </div>
   </div>
 </div>
@@ -630,42 +631,118 @@ window.updateOnePrice = async (id) => {
 const COND_LABELS=['① 上昇トレンド確認（75日線上向き・株価が75日線の上）','② 押し目が来ている（直近高値から5〜15%下落・25日線付近）','③ 反転サイン（陽線1〜3本＋出来高増加）','④ 過熱していない（RSI 70以下）','⑤ 相場環境が良い（VIX 20以下）'];
 const BONUS_LABELS=['直近決算が予想超え','明確な材料・テーマがある','出来高が20日平均の1.5倍以上','決算発表の2週間前後を避ける（確認済み）'];
 
+let detailId = null;
+
+const COND_SHORT = ['① 上昇トレンド確認','② 押し目が来ている','③ 反転サイン','④ 過熱していない','⑤ 相場環境が良い'];
+const COND_DESC  = ['75日線上向き・株価が75日線の上','直近高値から5〜15%下落・25日線付近','陽線1〜3本＋出来高増加','RSI 70以下','VIX 20以下'];
+
 window.showDetail = (id) => {
-  const s=stocks.find(s=>String(s.id)===String(id));
-  const diff=s.current-s.buy; const rate=(diff/s.buy*100).toFixed(2);
-  const rc=diff>0?'var(--red)':diff<0?'var(--green)':'var(--muted)';
-  const jClass=s.judgment==='green'?'green':s.judgment==='yellow'?'yellow':'red';
-  const jLabel=s.judgment==='green'?'🟢 買い':s.judgment==='yellow'?'🟡 様子見':'🔴 見送り';
-  const condHTML=(s.condChecks||[]).map((ok,i)=>`<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);align-items:flex-start;"><span style="font-size:14px;flex-shrink:0">${ok?'✅':'⬜'}</span><div><div style="font-size:12px;color:${ok?'var(--text)':'var(--muted)'}">${COND_LABELS[i]}</div>${(s.condNotes||[])[i]?`<div style="font-size:11px;color:var(--blue);margin-top:2px">${s.condNotes[i]}</div>`:''}</div></div>`).join('');
-  const bonusHTML=(s.bonusChecks||[]).map((ok,i)=>ok?`<div style="font-size:12px;color:var(--purple);padding:3px 0">✅ ${BONUS_LABELS[i]}</div>`:'').join('');
-  document.getElementById('modal-title').textContent=`${s.name} ${s.code?'('+s.code+')':''}`;
-  document.getElementById('modal-body').innerHTML=`
+  detailId = id;
+  const s = stocks.find(s => String(s.id) === String(id));
+  const diff = (s.current||0) - (s.buy||0);
+  const rate = s.buy > 0 ? (diff/s.buy*100).toFixed(2) : '0.00';
+  const rc = diff > 0 ? 'var(--red)' : diff < 0 ? 'var(--green)' : 'var(--muted)';
+  const inpStyle = 'background:transparent;border:none;border-bottom:1px solid var(--border);width:100%;font-size:15px;font-weight:600;color:inherit;padding:2px 0;outline:none;';
+
+  document.getElementById('modal-title').textContent = `✏️ 詳細・編集 — ${s.name}`;
+  document.getElementById('modal-body').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
-      <div style="background:var(--surface2);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">購入価格</div><div style="font-size:16px;font-weight:700">¥${s.buy.toLocaleString()}</div>${s.buyDate?`<div style="font-size:11px;color:var(--muted)">${s.buyDate}</div>`:''}</div>
-      <div style="background:var(--surface2);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">現在値</div><div style="font-size:16px;font-weight:700;color:${rc}">¥${s.current.toLocaleString()}</div><div style="font-size:11px;color:${rc}">${diff>=0?'+':''}${rate}%</div></div>
-      <div style="background:var(--surface2);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">目標価格</div><div style="font-size:15px;font-weight:600;color:var(--blue)">${s.target?'¥'+s.target.toLocaleString():'—'}</div></div>
-      <div style="background:var(--surface2);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">損切ライン</div><div style="font-size:15px;font-weight:600;color:var(--red)">${s.loss?'¥'+s.loss.toLocaleString():'—'}</div></div>
+      <div style="background:var(--surface2);border-radius:8px;padding:10px">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">購入価格 (円)</div>
+        <input type="number" id="d-buy" value="${s.buy||''}" style="${inpStyle}color:var(--text);">
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:10px">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">現在値</div>
+        <div style="font-size:16px;font-weight:700;color:${rc}">¥${(s.current||0).toLocaleString()}</div>
+        <div style="font-size:11px;color:${rc}">${diff>=0?'+':''}${rate}%</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:10px">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">目標価格 (円)</div>
+        <input type="number" id="d-target" value="${s.target||''}" style="${inpStyle}color:var(--blue);">
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:10px">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">損切ライン (円)</div>
+        <input type="number" id="d-loss" value="${s.loss||''}" style="${inpStyle}color:var(--red);">
+      </div>
     </div>
-    <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">判定</div><span style="padding:4px 14px;border-radius:20px;font-weight:700;font-size:14px;background:${jClass==='green'?'rgba(74,222,154,.15)':jClass==='yellow'?'rgba(250,204,21,.15)':'rgba(248,113,113,.15)'};color:${jClass==='green'?'var(--green)':jClass==='yellow'?'var(--yellow)':'var(--red)'}">${jLabel}（${s.checkedCount}/5）</span></div>
-    <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">押し目買い5条件</div>${condHTML}</div>
-    ${bonusHTML?`<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">加点条件</div>${bonusHTML}</div>`:''}
-    ${s.memo?`<div style="font-size:12px;color:var(--muted);border-top:1px solid var(--border);padding-top:10px;margin-bottom:12px">📝 ${s.memo}</div>`:''}
+
+    <div style="margin-bottom:10px">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">判定</div>
+      <span id="d-judge-badge" style="padding:4px 14px;border-radius:20px;font-weight:700;font-size:13px;display:inline-block"></span>
+    </div>
+
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">押し目買い5条件</div>
+    <div style="margin-bottom:12px">
+      ${COND_SHORT.map((label,i) => {
+        const ok=(s.condChecks||[])[i]; const note=(s.condNotes||[])[i]||'';
+        return `<label style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="d-cond${i}" ${ok?'checked':''} onchange="updateDetailJudge()" style="margin-top:3px;flex-shrink:0;width:15px;height:15px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:600">${label}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:1px">${COND_DESC[i]}</div>
+            <input id="d-cond${i}-note" value="${note.replace(/"/g,'&quot;')}" placeholder="メモ（任意）" style="margin-top:4px;background:var(--surface3);border:1px solid var(--border);border-radius:5px;padding:3px 7px;font-size:11px;color:var(--muted);width:100%;box-sizing:border-box">
+          </div>
+        </label>`;
+      }).join('')}
+    </div>
+
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">加点条件</div>
+    <div style="margin-bottom:14px">
+      ${BONUS_LABELS.map((label,i) => {
+        const ok=(s.bonusChecks||[])[i];
+        return `<label style="display:flex;gap:8px;align-items:center;padding:5px 0;cursor:pointer">
+          <input type="checkbox" id="d-bonus${i}" ${ok?'checked':''} style="width:15px;height:15px">
+          <span style="font-size:12px">${label}</span>
+        </label>`;
+      }).join('')}
+    </div>
+
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">メモ</div>
+    <textarea id="d-memo" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:13px;resize:vertical;min-height:56px;font-family:inherit;box-sizing:border-box" placeholder="メモを入力">${s.memo||''}</textarea>
+
     ${(s.adjustments||[]).length>0?`
-    <div style="border-top:1px solid var(--border);padding-top:12px">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">ライン変更履歴</div>
-      ${[...(s.adjustments)].reverse().map(adj=>`
+    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">ライン変更履歴</div>
+      ${[...(s.adjustments)].reverse().slice(0,3).map(adj=>`
         <div class="adj-item">
           <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
             <span style="color:var(--muted)">${new Date(adj.at).toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
-            <span style="font-size:11px;padding:1px 7px;border-radius:10px;background:${adj.type==='auto'?'rgba(96,165,250,.15)':'rgba(167,139,250,.15)'};color:${adj.type==='auto'?'var(--blue)':'var(--purple)'};">${adj.type==='auto'?'自動引き上げ':'手動編集'}</span>
+            <span style="font-size:10px;padding:1px 6px;border-radius:8px;background:${adj.type==='auto'?'rgba(96,165,250,.15)':'rgba(167,139,250,.15)'};color:${adj.type==='auto'?'var(--blue)':'var(--purple)'};">${adj.type==='auto'?'自動':'手動'}</span>
           </div>
-          <div>目標: <span style="color:var(--muted);text-decoration:line-through">¥${(adj.prevTarget||0).toLocaleString()}</span> → <b style="color:var(--blue)">¥${(adj.newTarget||0).toLocaleString()}</b></div>
-          <div>損切: <span style="color:var(--muted);text-decoration:line-through">¥${(adj.prevLoss||0).toLocaleString()}</span> → <b style="color:var(--red)">¥${(adj.newLoss||0).toLocaleString()}</b></div>
-          ${adj.memo?`<div style="color:var(--muted);font-style:italic;margin-top:2px">"${adj.memo}"</div>`:''}
+          <div style="font-size:12px">目標 <b style="color:var(--blue)">¥${(adj.newTarget||0).toLocaleString()}</b> / 損切 <b style="color:var(--red)">¥${(adj.newLoss||0).toLocaleString()}</b></div>
         </div>`).join('')}
     </div>`:''}
   `;
+  updateDetailJudge();
   document.getElementById('detailModal').classList.add('open');
+};
+
+window.updateDetailJudge = () => {
+  const count = [0,1,2,3,4].filter(i=>document.getElementById('d-cond'+i)?.checked).length;
+  const b = document.getElementById('d-judge-badge'); if(!b) return;
+  if(count===5)      { b.style.background='rgba(74,222,154,.15)'; b.style.color='var(--green)';  b.textContent=`🟢 買い（5/5）`; }
+  else if(count>=3)  { b.style.background='rgba(250,204,21,.15)'; b.style.color='var(--yellow)'; b.textContent=`🟡 様子見（${count}/5）`; }
+  else if(count>0)   { b.style.background='rgba(248,113,113,.15)';b.style.color='var(--red)';    b.textContent=`🔴 見送り（${count}/5）`; }
+  else               { b.style.background='rgba(255,255,255,.05)';b.style.color='var(--muted)';  b.textContent=`— 未判定`; }
+};
+
+window.saveStockDetail = async () => {
+  const s = stocks.find(s => String(s.id) === String(detailId)); if(!s) return;
+  const condChecks  = [0,1,2,3,4].map(i=>document.getElementById('d-cond'+i)?.checked||false);
+  const condNotes   = [0,1,2,3,4].map(i=>document.getElementById('d-cond'+i+'-note')?.value?.trim()||'');
+  const bonusChecks = [0,1,2,3].map(i=>document.getElementById('d-bonus'+i)?.checked||false);
+  const checkedCount = condChecks.filter(Boolean).length;
+  s.buy    = parseFloat(document.getElementById('d-buy')?.value)    || s.buy;
+  s.target = parseFloat(document.getElementById('d-target')?.value) || null;
+  s.loss   = parseFloat(document.getElementById('d-loss')?.value)   || null;
+  s.memo   = document.getElementById('d-memo')?.value?.trim() || '';
+  s.condChecks=condChecks; s.condNotes=condNotes; s.bonusChecks=bonusChecks;
+  s.checkedCount=checkedCount;
+  s.judgment = checkedCount===5?'green':checkedCount>=3?'yellow':checkedCount>0?'red':'none';
+  s.updatedAt = new Date().toLocaleString('ja-JP');
+  await saveStock(s);
+  window.closeModal();
+  showToast('✅ 保存しました');
 };
 
 window.closeModal = () => document.getElementById('detailModal').classList.remove('open');
@@ -1005,6 +1082,7 @@ function render() {
           <div class="sc-code">${stockCode||'—'}${s.buyDate?' · '+s.buyDate:''}</div>
         </div>
         <div class="sc-price-block">
+          <button style="font-size:10px;padding:2px 7px;border-radius:5px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);cursor:pointer;margin-bottom:4px;display:block;margin-left:auto" onclick="updateOnePrice('${s.id}')">📡 更新</button>
           <div class="sc-current ${rc}">¥${currentPrice.toLocaleString()}</div>
           <div class="sc-rate ${rc}">${sign}${rate}%</div>
         </div>
@@ -1021,11 +1099,10 @@ function render() {
       <div class="sc-footer" style="flex-direction:column;align-items:stretch;gap:6px;">
         <div class="sc-memo">${s.memo||''}</div>
         <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-items:center;">
-          <button class="btn btn-sm btn-price" onclick="updateOnePrice('${s.id}')">値更新</button>
-          <button class="btn btn-sm btn-ghost" onclick="showDetail('${s.id}')">詳細</button>
-          <button class="btn btn-sm" style="background:rgba(250,204,21,.15);color:var(--yellow);border:1px solid rgba(250,204,21,.3);padding:5px 10px;font-size:12px;font-weight:500;border-radius:8px;cursor:pointer;" onclick="openSettleModal('${s.id}')">決済</button>
           <button class="btn btn-sm" style="background:rgba(96,165,250,.15);color:var(--blue);border:1px solid rgba(96,165,250,.3);padding:5px 9px;font-size:11px;font-weight:600;border-radius:8px;cursor:pointer;" onclick="openAdjustModal('${s.id}')">📈引き上げ</button>
-          <button class="btn btn-sm btn-ghost" style="font-size:11px;padding:5px 9px;" onclick="openEditLinesModal('${s.id}')">✏️ライン</button>
+          <button class="btn btn-sm btn-ghost" style="font-size:11px;padding:5px 9px;" onclick="openEditLinesModal('${s.id}')">✏️ライン設定</button>
+          <button class="btn btn-sm btn-ghost" onclick="showDetail('${s.id}')">詳細・編集</button>
+          <button class="btn btn-sm" style="background:rgba(250,204,21,.15);color:var(--yellow);border:1px solid rgba(250,204,21,.3);padding:5px 10px;font-size:12px;font-weight:500;border-radius:8px;cursor:pointer;" onclick="openSettleModal('${s.id}')">決済</button>
           <button class="btn btn-sm btn-danger" style="padding:5px 8px;" onclick="deleteStock('${s.id}')">🗑</button>
         </div>
       </div>
