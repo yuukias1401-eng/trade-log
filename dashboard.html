@@ -254,7 +254,6 @@ tr.h-short td:first-child { border-left:3px solid #f87171; }
     <span id="dashUserInfo" style="font-size:10px;color:var(--text-muted);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle"></span>
     <button onclick="googleSignOut()" class="btn btn-ghost" style="font-size:11px;padding:4px 8px" title="ログアウト">🚪 ログアウト</button>
     <a href="index.html" class="btn btn-ghost" style="font-size:11px;padding:4px 10px;text-decoration:none">📈 トレードログ</a>
-    <button class="btn btn-ghost" onclick="exportCSV()">📄 CSV出力</button>
     <button class="btn btn-ghost" onclick="exportJSON()">💾 バックアップ</button>
     <button class="btn btn-ghost" onclick="restoreJSON()">📂 復元</button>
     <button class="btn btn-ghost" onclick="takeSnapshot()">📈 推移グラフ更新</button>
@@ -779,13 +778,15 @@ window._fbSyncWatchlist = async function(h) {
     var ref = window._db.collection('watchlist').doc(String(h.id));
     var snap = await ref.get();
     if (!snap.exists) {
-      var buy = parseFloat(h.price) || null;
+      var buy    = parseFloat(h.cost)  || null;  // h.cost = 取得単価（本当の購入価格）
+      var current = parseFloat(h.price) || buy || 0; // h.price = 現在値
       await ref.set({
         id: String(h.id), code: h.ticker||'', name: h.name||'',
         qty: parseFloat(h.qty)||null, buy: buy,
         target:  buy ? Math.round(buy * 1.10) : null,
         loss:    buy ? Math.round(buy * 0.95) : null,
-        current: buy || 0,
+        current: current,
+        currency: h.currency || 'JPY',
         memo:    (h.account||'') + ' · ダッシュボードから同期',
         fromDashboard: true,
         createdAt: Date.now()
