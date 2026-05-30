@@ -777,9 +777,10 @@ window._fbSyncWatchlist = async function(h) {
   try {
     var ref = window._db.collection('watchlist').doc(String(h.id));
     var snap = await ref.get();
+    var buy     = parseFloat(h.cost)  || null;  // h.cost = 取得単価（本当の購入価格）
+    var current = parseFloat(h.price) || buy || 0; // h.price = 現在値
     if (!snap.exists) {
-      var buy    = parseFloat(h.cost)  || null;  // h.cost = 取得単価（本当の購入価格）
-      var current = parseFloat(h.price) || buy || 0; // h.price = 現在値
+      // 新規作成
       await ref.set({
         id: String(h.id), code: h.ticker||'', name: h.name||'',
         qty: parseFloat(h.qty)||null, buy: buy,
@@ -790,6 +791,15 @@ window._fbSyncWatchlist = async function(h) {
         memo:    (h.account||'') + ' · ダッシュボードから同期',
         fromDashboard: true,
         createdAt: Date.now()
+      });
+    } else if (snap.data().fromDashboard === true) {
+      // ダッシュボード由来の既存ドキュメント → 購入価格・数量・現在値を最新に上書き
+      await ref.update({
+        buy:      buy,
+        qty:      parseFloat(h.qty) || null,
+        current:  current,
+        currency: h.currency || 'JPY',
+        code:     h.ticker || snap.data().code || ''
       });
     }
   } catch(e) { console.warn('Watchlist sync failed:', e); }
