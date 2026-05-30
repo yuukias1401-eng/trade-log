@@ -1051,16 +1051,17 @@ function chartUrl(code) {
   return `https://finance.yahoo.com/quote/${code}`;
 }
 
-function toTVSymbol(code, currency) {
+// 銘柄コードから市場を判別。US/HKはTradingView埋め込み可、JP(東証)はライセンス上埋め込み不可
+function chartMarket(code, currency) {
   if (!code) return null;
   const cur = (currency || 'JPY').toUpperCase();
-  if (/\.HK$/i.test(code))  return 'HKEX:' + code.replace(/\.HK$/i,'').replace(/^0+/,'');
-  if (/\.T$/i.test(code))   return 'TSE:'  + code.replace(/\.T$/i,'');
+  if (/\.HK$/i.test(code)) { const n = code.replace(/\.HK$/i,'').replace(/^0+/,''); return { market:'HK', tv:'HKEX:'+n, num:n }; }
+  if (/\.T$/i.test(code))  { const n = code.replace(/\.T$/i,''); return { market:'JP', num:n }; }
   if (/^\d{4,5}$/.test(code)) {
-    return cur === 'HKD' ? 'HKEX:' + code.replace(/^0+/,'') : 'TSE:' + code;
+    if (cur === 'HKD') { const n = code.replace(/^0+/,''); return { market:'HK', tv:'HKEX:'+n, num:n }; }
+    return { market:'JP', num:code };
   }
-  // 米国株等はそのまま（TradingViewが自動判別）
-  return code.toUpperCase();
+  return { market:'US', tv:code.toUpperCase() };
 }
 
 window.toggleChart = (id) => {
@@ -1074,19 +1075,32 @@ window.toggleChart = (id) => {
     wrap.dataset.loaded = '1';
     const s = stocks.find(s => String(s.id) === String(id));
     if (!s) return;
-    const sym = toTVSymbol(s.code ?? s.ticker ?? '', s.currency);
-    if (sym) {
-      // widgetembed はクエリパラメータ方式でiframe埋め込み専用。最も確実
-      const iframe = document.createElement('iframe');
-      iframe.src = `https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(sym)}&interval=D&theme=dark&style=1&locale=ja&hidesidetoolbar=1&withdateranges=1&hideideas=1&saveimage=0`;
-      iframe.style.cssText = 'display:block;width:100%;height:300px;border:0;border-radius:8px';
-      iframe.setAttribute('scrolling', 'no');
-      iframe.setAttribute('allowtransparency', 'true');
-      iframe.setAttribute('frameborder', '0');
-      wrap.appendChild(iframe);
-    } else {
+    const m = chartMarket(s.code ?? s.ticker ?? '', s.currency);
+    if (!m) {
       wrap.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">銘柄コードを登録するとチャートが表示されます</div>`;
+      return;
     }
+    if (m.market === 'JP') {
+      // 東証はTradingView無料埋め込み不可（JPXデータライセンス）→ 外部チャートへのリンク表示
+      wrap.innerHTML = `
+        <div style="padding:14px 12px;text-align:center">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px">日本株はアプリ内チャート非対応のため外部で表示します</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">
+            <a href="https://finance.yahoo.co.jp/quote/${m.num}.T" target="_blank" rel="noopener" style="text-decoration:none;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:12px">📈 Yahoo!ファイナンス</a>
+            <a href="https://kabutan.jp/stock/chart?code=${m.num}" target="_blank" rel="noopener" style="text-decoration:none;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:12px">📊 株探</a>
+            <a href="https://jp.tradingview.com/symbols/TSE-${m.num}/" target="_blank" rel="noopener" style="text-decoration:none;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:12px">📉 TradingView</a>
+          </div>
+        </div>`;
+      return;
+    }
+    // US/HK は TradingView widgetembed で埋め込み（クエリパラメータ方式・確実）
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(m.tv)}&interval=D&theme=dark&style=1&locale=ja&hidesidetoolbar=1&withdateranges=1&hideideas=1&saveimage=0`;
+    iframe.style.cssText = 'display:block;width:100%;height:300px;border:0;border-radius:8px';
+    iframe.setAttribute('scrolling', 'no');
+    iframe.setAttribute('allowtransparency', 'true');
+    iframe.setAttribute('frameborder', '0');
+    wrap.appendChild(iframe);
   }
 };
 
@@ -1209,7 +1223,7 @@ function render() {
         </div>
       </div>
       <div class="sc-bars">
-        <div class="sc-bar"><div class="sc-bar-label">購入価格</div><div class="sc-bar-val col-buy">¥${buyPrice.toLocaleString()}</div></div>
+        <div class="sc-bar"><div class="sc-bar-label">購入価格</div><div class="sc-bar-val col-buy">¥${buyPrice.toLocaleString()}</div>${s.buyDate?`<div style="font-size:10px;color:var(--muted);margin-top:2px">📅 ${s.buyDate}</div>`:''}</div>
         <div class="sc-bar"><div class="sc-bar-label">目標価格</div><div class="sc-bar-val col-target">${s.target?'¥'+s.target.toLocaleString():'—'}</div></div>
         <div class="sc-bar"><div class="sc-bar-label">損切ライン</div><div class="sc-bar-val col-loss">${s.loss?'¥'+s.loss.toLocaleString():'—'}</div></div>
       </div>
