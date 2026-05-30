@@ -1076,21 +1076,13 @@ window.toggleChart = (id) => {
     if (!s) return;
     const sym = toTVSymbol(s.code ?? s.ticker ?? '', s.currency);
     if (sym) {
-      // innerHTML内でJSON的な"を使うとHTML属性が壊れるため、createElement経由でsrcをセット
-      const cfg = JSON.stringify({
-        symbol: sym, width: '100%', height: 220,
-        dateRange: '3M', colorTheme: 'dark',
-        trendLineColor: 'rgba(74,222,154,1)',
-        underLineColor: 'rgba(74,222,154,0.08)',
-        isTransparent: true, autosize: true
-      });
+      // widgetembed はクエリパラメータ方式でiframe埋め込み専用。最も確実
       const iframe = document.createElement('iframe');
-      iframe.src = `https://s.tradingview.com/embed-widget/mini-symbol-overview/?locale=ja#${cfg}`;
-      iframe.width = '100%';
-      iframe.height = '220';
-      iframe.frameBorder = '0';
-      iframe.scrolling = 'no';
-      iframe.style.cssText = 'display:block;border-radius:8px';
+      iframe.src = `https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(sym)}&interval=D&theme=dark&style=1&locale=ja&hidesidetoolbar=1&withdateranges=1&hideideas=1&saveimage=0`;
+      iframe.style.cssText = 'display:block;width:100%;height:300px;border:0;border-radius:8px';
+      iframe.setAttribute('scrolling', 'no');
+      iframe.setAttribute('allowtransparency', 'true');
+      iframe.setAttribute('frameborder', '0');
       wrap.appendChild(iframe);
     } else {
       wrap.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">銘柄コードを登録するとチャートが表示されます</div>`;
@@ -1138,14 +1130,16 @@ function render() {
       const cRange = cMax - cMin;
       const p = v => cRange > 0 ? (v - cMin) / cRange * 100 : 50;
 
-      const solidL = Math.max(0, p(lo));
-      const solidW = Math.max(0, Math.min(p(hi) - solidL, 100 - solidL));
-      const ghostL = Math.max(0, p(origLo));
-      const ghostW = Math.max(0, Math.min(p(origHi) - ghostL, 100 - ghostL));
+      // 現在レンジ（現損切→現目標）の塗り
+      const curL = Math.max(0, p(lo));
+      const curW = Math.max(0, p(hi) - curL);
+      // 元レンジ（灰色）の塗り
+      const origL = Math.max(0, p(origLo));
+      const origW = Math.max(0, p(origHi) - origL);
 
-      // 現在値マーカー: 目標を最大+18pp超まで表示OK
-      const markerP = Math.min(Math.max(p(cur), solidL - 2), p(hi) + 18);
-      const buyP    = Math.min(Math.max(p(buy), 1), 99);
+      // 現在値マーカー（目標超過時はバー右端をオーバーフロー表示）
+      const markerP = Math.max(-2, Math.min(p(cur), 116));
+      const buyP    = Math.min(Math.max(p(buy), 0), 100);
 
       const isPast = cur >= hi;
       const isLoss = cur <= lo;
@@ -1157,26 +1151,27 @@ function render() {
       const curLoPct  = fmtP(lo);
       const curHiPct  = fmtP(hi);
 
-      const fillStyle = isPast
-        ? 'background:var(--green);box-shadow:0 0 8px rgba(74,222,154,.5)'
-        : 'background:linear-gradient(90deg,var(--red),var(--green))';
-
       const alertHTML = isPast
         ? `<div class="alert-badge alert-win">🔔 目標到達！引き上げを検討</div>`
         : isLoss ? `<div class="alert-badge alert-lose">🚨 損切ライン割れ！</div>` : '';
 
-      // ラベル（showGhost時は購入時+現在の2行）
+      // 縦ライン生成（元=灰色 / 現=白で強調）
+      const tick = (pos, color, op, z) => `<div style="position:absolute;top:-4px;left:${Math.max(0,Math.min(pos,100)).toFixed(1)}%;width:2px;height:16px;background:${color};opacity:${op};transform:translateX(-50%);border-radius:1px;z-index:${z}"></div>`;
+      const ghostTicks = showGhost ? tick(p(origLo), '#9ca3af', .85, 2) + tick(p(origHi), '#9ca3af', .85, 2) : '';
+      const curTicks   = tick(p(lo), '#fff', 1, 4) + tick(p(hi), isPast?'var(--green)':'#fff', 1, 4);
+
+      // ラベル（showGhost時は 元=灰 / 現=太字 の2行）
       const leftLabel = showGhost
-        ? `<div style="font-size:11px;color:var(--red);line-height:1.6">
-            <span style="opacity:.5;font-size:10px">${origLoPct}% 損切（購入時）</span><br>
-            <b>${curLoPct}% 損切（現在）</b></div>`
-        : `<span style="font-size:11px;font-weight:600;color:var(--red)">${origLoPct}% 損切</span>`;
+        ? `<div style="font-size:11px;line-height:1.5">
+            <span style="color:#9ca3af;font-size:10px">${origLoPct}% 損切（元）</span><br>
+            <b style="color:var(--red)">${curLoPct}% 損切</b></div>`
+        : `<span style="font-size:11px;font-weight:600;color:var(--red)">${curLoPct}% 損切</span>`;
 
       const rightLabel = showGhost
-        ? `<div style="font-size:11px;color:${isPast?'var(--green)':'var(--blue)'};text-align:right;line-height:1.6">
-            <span style="opacity:.5;font-size:10px">+${origHiPct}% 目標（購入時）</span><br>
-            <b>${isPast ? '超過🎯' : `+${curHiPct}% 目標（現在）`}</b></div>`
-        : `<span style="font-size:11px;font-weight:600;color:${isPast?'var(--green)':'var(--blue)'}">${isPast ? '超過🎯' : `+${origHiPct}% 目標`}</span>`;
+        ? `<div style="font-size:11px;text-align:right;line-height:1.5">
+            <span style="color:#9ca3af;font-size:10px">+${origHiPct}% 目標（元）</span><br>
+            <b style="color:${isPast?'var(--green)':'var(--blue)'}">${isPast ? '超過🎯' : `+${curHiPct}% 目標`}</b></div>`
+        : `<span style="font-size:11px;font-weight:600;color:${isPast?'var(--green)':'var(--blue)'}">${isPast ? '超過🎯' : `+${curHiPct}% 目標`}</span>`;
 
       gaugeHTML = `
         ${alertHTML}
@@ -1186,11 +1181,12 @@ function render() {
             <span style="color:var(--blue)">目標 ¥${hi.toLocaleString()}</span>
           </div>
           <div class="gauge-track">
-            ${showGhost ? `<div style="position:absolute;top:0;left:${ghostL.toFixed(1)}%;width:${ghostW.toFixed(1)}%;height:100%;border-radius:4px;
-              background:repeating-linear-gradient(90deg,rgba(255,255,255,.2) 0,rgba(255,255,255,.2) 3px,transparent 3px,transparent 7px)"></div>` : ''}
-            <div style="position:absolute;top:0;left:${solidL.toFixed(1)}%;width:${solidW.toFixed(1)}%;height:100%;border-radius:4px;${fillStyle}"></div>
-            <div style="position:absolute;top:-3px;left:${buyP.toFixed(1)}%;width:2px;height:14px;background:var(--muted);border-radius:1px;transform:translateX(-50%);opacity:.55" title="購入価格 ¥${buy.toLocaleString()}"></div>
-            <div class="gauge-marker" style="left:${markerP.toFixed(1)}%;background:${isPast?'var(--green)':'white'}"></div>
+            ${showGhost ? `<div style="position:absolute;top:0;left:${origL.toFixed(1)}%;width:${origW.toFixed(1)}%;height:100%;border-radius:4px;background:rgba(156,163,175,.22)"></div>` : ''}
+            <div style="position:absolute;top:0;left:${curL.toFixed(1)}%;width:${curW.toFixed(1)}%;height:100%;border-radius:4px;${isPast?'background:var(--green);box-shadow:0 0 8px rgba(74,222,154,.5)':'background:linear-gradient(90deg,var(--red),var(--green))'}"></div>
+            ${ghostTicks}
+            ${curTicks}
+            <div style="position:absolute;top:-1px;left:${buyP.toFixed(1)}%;width:2px;height:10px;background:var(--muted);border-radius:1px;transform:translateX(-50%);opacity:.5;z-index:3" title="購入価格 ¥${buy.toLocaleString()}"></div>
+            <div class="gauge-marker" style="left:${markerP.toFixed(1)}%;background:${isPast?'var(--green)':'white'};z-index:5"></div>
           </div>
           <div class="gauge-remain">${leftLabel}${rightLabel}</div>
         </div>`;
