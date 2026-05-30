@@ -601,6 +601,15 @@ window.promptPrice = async (id) => {
   showToast(`✅ ${s.name} を ¥${price.toLocaleString()} に更新`);
 };
 
+window.setBuyDate = async (id, val) => {
+  const s=stocks.find(s=>String(s.id)===String(id));
+  if(!s) return;
+  s.buyDate = val || '';
+  s.updatedAt = new Date().toLocaleString('ja-JP');
+  await saveStock(s);
+  showToast(val ? `📅 購入日を ${val} に設定` : '📅 購入日をクリアしました');
+};
+
 const PROXIES=[u=>u, u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`, u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`, u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`, u=>`https://thingproxy.freeboard.io/fetch/${u}`];
 
 async function fetchWithTimeout(url,ms=8000){
@@ -1245,9 +1254,13 @@ function render() {
         </div>
       </div>
       <div class="sc-bars">
-        <div class="sc-bar"><div class="sc-bar-label">購入価格</div><div class="sc-bar-val col-buy">¥${buyPrice.toLocaleString()}</div>${s.buyDate?`<div style="font-size:10px;color:var(--muted);margin-top:2px">📅 ${s.buyDate}</div>`:''}</div>
+        <div class="sc-bar"><div class="sc-bar-label">購入価格</div><div class="sc-bar-val col-buy">¥${buyPrice.toLocaleString()}</div></div>
         <div class="sc-bar"><div class="sc-bar-label">目標価格</div><div class="sc-bar-val col-target">${s.target?'¥'+s.target.toLocaleString():'—'}</div></div>
         <div class="sc-bar"><div class="sc-bar-label">損切ライン</div><div class="sc-bar-val col-loss">${s.loss?'¥'+s.loss.toLocaleString():'—'}</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:11px;color:var(--muted);white-space:nowrap">📅 購入日</span>
+        <input type="date" value="${s.buyDate||''}" onchange="setBuyDate('${s.id}', this.value)" style="flex:1;font-size:12px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-family:inherit">
       </div>
       ${gaugeHTML}
       ${stockCode?`<div style="margin-bottom:8px">
