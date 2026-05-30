@@ -792,14 +792,16 @@ window._fbSyncWatchlist = async function(h) {
         fromDashboard: true,
         createdAt: Date.now()
       });
-    } else if (snap.data().fromDashboard === true) {
-      // ダッシュボード由来の既存ドキュメント → 購入価格・数量・現在値を最新に上書き
+    } else {
+      // 既存ドキュメント → 購入価格・数量・現在値を常に最新に上書き
+      // （IDがdashboard holdingのIDと一致する = ダッシュボード由来と判断）
       await ref.update({
-        buy:      buy,
-        qty:      parseFloat(h.qty) || null,
-        current:  current,
-        currency: h.currency || 'JPY',
-        code:     h.ticker || snap.data().code || ''
+        buy:           buy,
+        qty:           parseFloat(h.qty) || null,
+        current:       current,
+        currency:      h.currency || 'JPY',
+        code:          h.ticker || snap.data().code || '',
+        fromDashboard: true  // フラグが抜けていた旧ドキュメントにも付与
       });
     }
   } catch(e) { console.warn('Watchlist sync failed:', e); }
