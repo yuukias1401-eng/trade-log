@@ -1341,10 +1341,16 @@ async function fetchPricesBatch(targets, btnId, label) {
       let p = null;
       if(isUS && getFinnhubKey()) p = await finnhubFetch(sym);
       if(p===null) p = await yahooFetch(sym);
+      // 前回価格と50%以上乖離している場合は異常値として弾き、古い値を維持（静かに）
+      if(p!==null && h.price && parseFloat(h.price)>0){
+        const prev = parseFloat(h.price);
+        if(Math.abs(p - prev) / prev > 0.5) p = null;
+      }
       if(p!==null){
         h.price=p;
         successList.push({name:h.name, sym, price:p});
-      } else {
+      } else if(!h.price){
+        // 価格が一度も取れていない場合だけ失敗扱い
         failList.push({name:h.name, sym, h});
       }
     }));
