@@ -1131,64 +1131,110 @@ function renderAllocation() {
   try { const d=localStorage.getItem('portfolio_v6_targets'); if(d) tgts=JSON.parse(d); } catch(e){}
   try { const d=localStorage.getItem('portfolio_v6_fx');      if(d) fx=JSON.parse(d);   } catch(e){}
 
-  if (!Object.keys(tgts).length || !hlds.length) { el.style.display='none'; return; }
+  if (!hlds.length) { el.style.display='none'; return; }
 
-  // 円換算 (dashboard.html の getValJPY / getVal と同じロジック)
+  // 円換算（dashboard.html の getValJPY と同ロジック）
   function getValJPY(h) {
     let price = parseFloat(h.price)||0;
     if(!price && h.currency && fx[h.currency]) price = fx[h.currency];
     const qty = parseFloat(h.qty)||0;
     const raw = price * qty;
     const val = (h.isToushin || String(h.category||'').startsWith('投信')) ? raw/10000 : raw;
-    const cur = h.currency||'JPY';
+    const cur = (h.currency||'JPY').toUpperCase();
     if(cur==='JPY') return val;
     if(cur==='USD' && fx.USD) return val*fx.USD;
     if(cur==='HKD' && fx.HKD) return val*fx.HKD;
     return val;
   }
 
-  const totalJPY = hlds.reduce((s,h)=>s+getValJPY(h), 0);
-  if (totalJPY <= 0) { el.style.display='none'; return; }
+  const totalJPY  = hlds.reduce((s,h) => s + getValJPY(h), 0);
+  const cashHlds  = hlds.filter(h => h.category === '現金');
+  if (!cashHlds.length || totalJPY <= 0) { el.style.display='none'; return; }
 
-  // カテゴリ別集計
-  const catMap = {};
-  hlds.forEach(h => {
-    const cat = h.category||'不明';
-    catMap[cat] = (catMap[cat]||0) + getValJPY(h);
-  });
+  // 通貨でグループ化
+  const curMap = {};
+  for (const h of cashHlds) {
+    const cur = (h.currency||'JPY').toUpperCase();
+    if (!curMap[cur]) curMap[cur] = { cur, jpy:0, accounts:[] };
+    curMap[cur].jpy += getValJPY(h);
+    if (h.name) curMap[cur].accounts.push(h.name);
+  }
+  const curList   = Object.values(curMap).sort((a,b) => b.jpy - a.jpy);
+  const totalCash = curList.reduce((s,c) => s + c.jpy, 0);
 
-  const rows = Object.entries(tgts).map(([cat, tgt]) => {
-    const actual = (catMap[cat]||0) / totalJPY * 100;
-    const diff   = actual - tgt;
-    const absDiff = Math.abs(diff);
-    const sign = diff >= 0 ? '+' : '';
-    const diffColor = absDiff < 2 ? 'var(--muted)' : diff > 0 ? 'var(--red)' : 'var(--blue)';
+  const cashTgtPct = tgts['現金'] || 0;
+  const idealCash  = cashTgtPct > 0 ? totalJPY * cashTgtPct / 100 : 0;
+  const excess     = totalCash - idealCash;
+
+  function fmtJPY(v) { return '¥ ' + Math.round(Math.abs(v)).toLocaleString(); }
+
+  // サマリーボックス
+  const exColor = excess >= 0 ? 'var(--red)' : 'var(--blue)';
+  const exLabel = excess >= 0
+    ? `<span style="color:var(--red);font-weight:700">${fmtJPY(excess)} 過剰</span>`
+    : `<span style="color:var(--blue);font-weight:700">${fmtJPY(excess)} 不足</span>`;
+  const summaryHTML = cashTgtPct > 0 ? `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 14px;background:var(--surface2);border-radius:10px;margin-bottom:12px">
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">現在の現金合計</div>
+        <div style="font-size:15px;font-weight:700">${fmtJPY(totalCash)}</div>
+        <div style="font-size:10px;color:var(--muted)">総資産の${(totalCash/totalJPY*100).toFixed(1)}%</div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">目標額（${cashTgtPct}%）</div>
+        <div style="font-size:15px;font-weight:700;color:var(--muted)">${fmtJPY(idealCash)}</div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">差額</div>
+        <div style="font-size:14px">${exLabel}</div>
+        <div style="font-size:10px;color:var(--muted)">${excess>=0?'↓ 各通貨の按分参照':'↑ 資金確保を検討'}</div>
+      </div>
+    </div>` : `<div style="font-size:11px;color:var(--muted);margin-bottom:10px">ダッシュボードで現金の目標%を設定すると余剰が計算されます</div>`;
+
+  // 通貨別行
+  const curRows = curList.map(c => {
+    const share    = totalCash > 0 ? c.jpy / totalCash : 0;
+    const myExcess = excess * share;
+    const remain   = c.jpy - myExcess;
+    const curLabel = c.cur==='JPY'?'🇯🇵 日本円':c.cur==='USD'?'🇺🇸 米ドル':c.cur==='HKD'?'🇭🇰 香港ドル':c.cur;
+    const accStr   = c.accounts.length ? `（${c.accounts[0]}）` : '';
+    const exC      = myExcess >= 0 ? 'var(--red)' : 'var(--blue)';
+    const exTxt    = myExcess >= 0
+      ? `▼ ${fmtJPY(myExcess)} 投資へ`
+      : `▲ ${fmtJPY(myExcess)} 不足`;
     return `<tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:7px 8px;font-size:13px">${cat}</td>
-      <td style="padding:7px 8px;font-size:12px;text-align:right;color:var(--muted)">${tgt.toFixed(1)}%</td>
-      <td style="padding:7px 8px;font-size:13px;text-align:right;font-weight:600">${actual.toFixed(1)}%</td>
-      <td style="padding:7px 8px;font-size:13px;text-align:right;font-weight:700;color:${diffColor}">${sign}${diff.toFixed(1)}%</td>
+      <td style="padding:8px 6px">
+        <div style="font-size:12px;font-weight:600">${curLabel}</div>
+        <div style="font-size:10px;color:var(--muted)">${accStr}</div>
+      </td>
+      <td style="padding:8px 6px;text-align:right;font-size:13px;font-weight:600">${fmtJPY(c.jpy)}</td>
+      <td style="padding:8px 6px;text-align:right;font-size:11px;color:var(--muted)">${(share*100).toFixed(1)}%</td>
+      <td style="padding:8px 6px;text-align:right;font-size:12px;font-weight:600;color:${exC}">${exTxt}</td>
+      <td style="padding:8px 6px;text-align:right;font-size:12px;color:var(--muted)">${fmtJPY(remain)}</td>
     </tr>`;
   }).join('');
 
   el.style.display = '';
   el.innerHTML = `
     <div class="card" style="margin-bottom:90px">
-      <div class="card-title">📊 目標配分チェック</div>
-      <table style="width:100%;border-collapse:collapse">
-        <thead>
-          <tr style="border-bottom:2px solid var(--border)">
-            <th style="padding:4px 8px;font-size:10px;color:var(--muted);text-align:left;font-weight:600;letter-spacing:.5px">カテゴリ</th>
-            <th style="padding:4px 8px;font-size:10px;color:var(--muted);text-align:right;font-weight:600;letter-spacing:.5px">目標</th>
-            <th style="padding:4px 8px;font-size:10px;color:var(--muted);text-align:right;font-weight:600;letter-spacing:.5px">現在</th>
-            <th style="padding:4px 8px;font-size:10px;color:var(--muted);text-align:right;font-weight:600;letter-spacing:.5px">過不足</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <div style="margin-top:10px;font-size:10px;color:var(--muted);display:flex;justify-content:space-between;align-items:center">
-        <span style="color:var(--blue);font-size:9px">▲過剰 / ▼不足</span>
-        <span>総資産 ¥${Math.round(totalJPY).toLocaleString()}（ダッシュボードより）</span>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="card-title" style="margin-bottom:0">💴 待機資金 <span style="font-size:10px;font-weight:400;color:var(--muted)">通貨別まとめ</span></div>
+        <div style="font-size:13px;font-weight:600">${fmtJPY(totalCash)}</div>
+      </div>
+      ${summaryHTML}
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;min-width:340px">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border)">
+              <th style="padding:4px 6px;font-size:10px;color:var(--muted);text-align:left;font-weight:600">通貨</th>
+              <th style="padding:4px 6px;font-size:10px;color:var(--muted);text-align:right;font-weight:600">現在残高(円換算)</th>
+              <th style="padding:4px 6px;font-size:10px;color:var(--muted);text-align:right;font-weight:600">現金内比率</th>
+              <th style="padding:4px 6px;font-size:10px;color:var(--muted);text-align:right;font-weight:600">投資へ回す目安</th>
+              <th style="padding:4px 6px;font-size:10px;color:var(--muted);text-align:right;font-weight:600">目標後の残高</th>
+            </tr>
+          </thead>
+          <tbody>${curRows}</tbody>
+        </table>
       </div>
     </div>`;
 }
