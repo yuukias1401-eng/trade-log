@@ -1151,23 +1151,20 @@ async function yahooFetch(symbol) {
     `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d&_=${cb}`,
     `https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d&_=${cb}`,
   ];
-  // 全プロキシ×全エンドポイントを並列投げ → 最速成功を採用
-  const attempts = [];
-  for(const ep of endpoints) {
-    for(const mkProxy of PROXIES) {
-      attempts.push(
-        fetchWithTimeout(mkProxy(ep), {headers:{'Accept':'application/json'}}, 7000)
-          .then(res => { if(!res.ok) throw new Error('ng'); return res.json(); })
-          .then(data => {
-            const parsed = typeof data==='string' ? JSON.parse(data) : data;
-            const price = parsed?.chart?.result?.[0]?.meta?.regularMarketPrice;
-            if(price && price>0) return price;
-            throw new Error('no price');
-          })
-      );
+  // プロキシを順番に試す（並列投げをやめて混線を防ぐ）
+  for(const mkProxy of PROXIES) {
+    for(const ep of endpoints) {
+      try {
+        const res = await fetchWithTimeout(mkProxy(ep), {headers:{'Accept':'application/json'}}, 7000);
+        if(!res.ok) continue;
+        const data = await res.json();
+        const parsed = typeof data==='string' ? JSON.parse(data) : data;
+        const price = parsed?.chart?.result?.[0]?.meta?.regularMarketPrice;
+        if(price && price>0) return price;
+      } catch(e) { continue; }
     }
   }
-  try { return await Promise.any(attempts); } catch(e) { return null; }
+  return null;
 }
 
 // ── CoinGecko（暗号通貨・CORS許可・APIキー不要）──
