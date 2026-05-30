@@ -713,6 +713,16 @@ window.showDetail = (id) => {
           <div style="font-size:12px">目標 <b style="color:var(--blue)">¥${(adj.newTarget||0).toLocaleString()}</b> / 損切 <b style="color:var(--red)">¥${(adj.newLoss||0).toLocaleString()}</b></div>
         </div>`).join('')}
     </div>`:''}
+    ${(s.code||s.ticker)?`
+    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px">
+      <button onclick="toggleTVChart('${s.id}')" id="tv-btn-${s.id}"
+        style="width:100%;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;text-align:left">
+        📊 TradingViewチャートを表示
+      </button>
+      <div id="tv-wrap-${s.id}" style="display:none;margin-top:8px;border-radius:8px;overflow:hidden">
+        <iframe id="tv-frame-${s.id}" src="" width="100%" height="340" frameborder="0" scrolling="no" style="display:block;border:0"></iframe>
+      </div>
+    </div>`:''}
   `;
   updateDetailJudge();
   document.getElementById('detailModal').classList.add('open');
@@ -747,6 +757,26 @@ window.saveStockDetail = async () => {
 };
 
 window.closeModal = () => document.getElementById('detailModal').classList.remove('open');
+
+window.toggleTVChart = (id) => {
+  const s = stocks.find(s => String(s.id) === String(id));
+  if (!s) return;
+  const wrap = document.getElementById('tv-wrap-' + id);
+  const btn  = document.getElementById('tv-btn-' + id);
+  if (!wrap) return;
+  const isOpen = wrap.style.display !== 'none';
+  wrap.style.display = isOpen ? 'none' : 'block';
+  btn.textContent = isOpen ? '📊 TradingViewチャートを表示' : '📊 チャートを閉じる';
+  if (!isOpen) {
+    const code = (s.code || s.ticker || '').trim();
+    const cur  = (s.currency || 'JPY').toUpperCase();
+    let sym = code;
+    if (cur === 'JPY' && /^\d{4,5}$/.test(code)) sym = 'TSE:' + code;
+    else if (cur === 'HKD') sym = 'HKEX:' + code.replace(/^0+/, '');
+    document.getElementById('tv-frame-' + id).src =
+      'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym) + '&theme=dark';
+  }
+};
 document.getElementById('detailModal').addEventListener('click', e=>{
   if(e.target===document.getElementById('detailModal')) window.closeModal();
 });
