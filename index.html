@@ -405,7 +405,7 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
@@ -426,8 +426,9 @@ const historyCol = collection(db, 'history');
 
 let stocks  = [];
 let history = [];
-let _unsubStocks  = null;
-let _unsubHistory = null;
+let _unsubStocks    = null;
+let _unsubHistory   = null;
+let _unsubPortfolio = null;
 
 function setSyncStatus(state) {
   const el = document.getElementById('syncStatus');
@@ -464,11 +465,32 @@ onAuthStateChanged(auth, (user) => {
         renderStats();
       });
     }
+    // 待機資金用：ダッシュボードの保有資産（users/{uid}/holdings）をFirestoreから直接購読
+    // → localStorage 依存をやめ、別デバイス・別タブの更新もリアルタイム反映
+    if (!_unsubPortfolio) {
+      const uref    = doc(db, 'users', user.uid);
+      const holdCol = collection(db, 'users', user.uid, 'holdings');
+      _unsubPortfolio = onSnapshot(holdCol, async (snap) => {
+        const hlds = snap.docs.map(d => d.data());
+        if (!hlds.length) { renderAllocation(); return; }
+        try { localStorage.setItem('portfolio_v6', JSON.stringify(hlds)); } catch(e){}
+        try {
+          const ms = await getDoc(uref);
+          if (ms.exists()) {
+            const meta = ms.data();
+            if (meta.fxRates)     localStorage.setItem('portfolio_v6_fx',      JSON.stringify(meta.fxRates));
+            if (meta.targetAlloc) localStorage.setItem('portfolio_v6_targets', JSON.stringify(meta.targetAlloc));
+          }
+        } catch(e){ console.warn('[portfolio meta]', e); }
+        renderAllocation();
+      }, (e) => console.warn('[portfolio]', e));
+    }
   } else {
     document.getElementById('loginOverlay').style.display = 'flex';
     setSyncStatus('login');
-    if (_unsubStocks)  { _unsubStocks();  _unsubStocks  = null; }
-    if (_unsubHistory) { _unsubHistory(); _unsubHistory = null; }
+    if (_unsubStocks)    { _unsubStocks();    _unsubStocks    = null; }
+    if (_unsubHistory)   { _unsubHistory();   _unsubHistory   = null; }
+    if (_unsubPortfolio) { _unsubPortfolio(); _unsubPortfolio = null; }
     stocks = []; history = [];
     render(); renderHistory(); renderStats();
   }
