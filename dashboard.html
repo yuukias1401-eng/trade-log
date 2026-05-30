@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -275,7 +275,6 @@ tr.h-short td:first-child { border-left:3px solid #f87171; }
   <button class="btn btn-ghost" id="fxBtn" onclick="fetchAllFX()" style="font-size:11px;padding:4px 10px;">🔄 為替更新</button>
       <button class="btn btn-ghost" id="privacyBtn" onclick="togglePrivacy()" title="金額表示の切替" style="font-size:11px;padding:4px 10px;">👁 金額表示</button>
         <button class="btn btn-ghost" onclick="exportForMobile()" style="font-size:11px;padding:4px 10px;color:#60a5fa;border-color:#60a5fa;" title="クリックで共有シート表示（AirDrop・メール・LINEなど）">📱 スマホ共有</button>
-        <button class="btn btn-ghost" onclick="promptFinnhubKey()" style="font-size:11px;padding:4px 10px;color:#f59e0b;border-color:#f59e0b;" title="Finnhub APIキー設定（米国株取得精度向上）" id="finnhubBtn">🔑 Finnhub</button>
   <span class="fx-label" id="fxUpdated"></span>
 </div>
 
@@ -284,7 +283,6 @@ tr.h-short td:first-child { border-left:3px solid #f87171; }
   <button class="tab-btn active" onclick="switchTab('dashboard')">📊 ダッシュボード</button>
   <button class="tab-btn" onclick="switchTab('history')">📈 推移グラフ</button>
   <button class="tab-btn" onclick="switchTab('watch')">🔴 ウォッチリスト</button>
-  <button class="tab-btn" onclick="switchTab('virtual')">🎮 仮想トレード</button>
 </div>
 
 <!-- ═══ DASHBOARD TAB ═══ -->
@@ -456,58 +454,6 @@ tr.h-short td:first-child { border-left:3px solid #f87171; }
 </div>
 </div><!-- /tab-watch -->
 
-<div id="tab-virtual" class="tab-page">
-<div class="main">
-  <div class="section-header" style="margin-bottom:16px">
-    <div class="section-title">🎮 仮想トレード <span style="font-size:12px;font-weight:400;color:var(--text-muted)">スイングトレード練習</span></div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button class="btn btn-ghost" onclick="fetchVirtualPrices()" style="font-size:11px;padding:4px 10px;color:#60a5fa;border-color:#60a5fa;" id="virtualPriceBtn">📡 株価更新</button>
-      <button class="btn btn-ghost" onclick="importFromClipboard()" style="font-size:11px;padding:4px 10px;color:#a78bfa;border-color:#a78bfa;" id="coworkPasteBtn">📋 Coworkから貼り付け</button>
-      <button class="btn btn-ghost" onclick="document.getElementById('coworkImportInput').click()" style="font-size:11px;padding:4px 10px;color:#6b7280;border-color:#6b7280;font-size:10px;">📁 JSON</button>
-      <input type="file" id="coworkImportInput" accept=".json" style="display:none" onchange="importFromCowork(this)">
-      <button class="btn btn-primary" onclick="openVirtualAddModal()" style="font-size:11px;padding:5px 12px;">＋ 仮想ポジション追加</button>
-    </div>
-  </div>
-  <div id="virtualContent"></div>
-</div>
-</div><!-- /tab-virtual -->
-
-<!-- ─── 仮想ポジション追加モーダル ─── -->
-<div class="modal-overlay" id="virtualModalOverlay">
-  <div class="modal" style="max-width:460px">
-    <div class="modal-header"><span class="modal-title">🎮 仮想ポジション追加・編集</span>
-      <button class="modal-close" onclick="closeVirtualModal()">×</button></div>
-    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
-      <input type="hidden" id="vEditId">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div><div class="form-label">銘柄名</div><input class="form-input" id="vName" placeholder="ディスコ"></div>
-        <div><div class="form-label">ティッカー / 銘柄コード</div><input class="form-input" id="vTicker" placeholder="6146 / LUNR"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div><div class="form-label">通貨</div>
-          <select class="form-input" id="vCurrency">
-            <option value="JPY">JPY（日本株）</option>
-            <option value="USD">USD（米国株）</option>
-          </select></div>
-        <div><div class="form-label">仮想購入日</div><input class="form-input" type="date" id="vBuyDate"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-        <div><div class="form-label">仮想購入価格</div><input class="form-input" id="vBuyPrice" type="number" placeholder="65700" oninput="autoFillVirtualPrices(this.value)"></div>
-        <div><div class="form-label">株数</div><input class="form-input" id="vQty" type="number" placeholder="5"></div>
-        <div><div class="form-label">現在値（任意）</div><input class="form-input" id="vCurrentPrice" type="number" placeholder="自動取得"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div><div class="form-label">目標価格 (+10%目安)</div><input class="form-input" id="vTargetPrice" type="number" placeholder="70000"></div>
-        <div><div class="form-label">損切りライン (-5%目安)</div><input class="form-input" id="vStopLoss" type="number" placeholder="62400"></div>
-      </div>
-      <div><div class="form-label">メモ</div><textarea class="form-input" id="vNote" rows="2" placeholder="テーマ・エントリー理由など" style="resize:vertical"></textarea></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeVirtualModal()">キャンセル</button>
-      <button class="btn btn-primary" onclick="saveVirtualPosition()">保存</button>
-    </div>
-  </div>
-</div>
 
 <!-- ═══ MODALS ═══ -->
 
@@ -1125,7 +1071,6 @@ function load() {
   try { const f = localStorage.getItem('portfolio_v6_fx'); if(f) fxRates = {...fxRates,...JSON.parse(f)}; } catch(e){}
   try { const t = localStorage.getItem('portfolio_v6_targets'); if(t) targetAlloc = JSON.parse(t); } catch(e){}
   loadWatchData();
-  loadVirtualData();
 }
 function loadSnaps() { try { return JSON.parse(localStorage.getItem('portfolio_v6_snaps')||'[]'); } catch(e){ return []; } }
 function saveSnaps(s) { localStorage.setItem('portfolio_v6_snaps', JSON.stringify(s)); }
@@ -3164,17 +3109,6 @@ async function exportForMobile() {
   showToast('✅ ' + filename + ' をダウンロードしました。AirDropでスマホへ送れます。');
 }
 
-function promptFinnhubKey() {
-  const cur = getFinnhubKey();
-  const key = prompt(
-    'Finnhub APIキーを入力してください\n（無料登録: https://finnhub.io ）\n\n未入力で削除します',
-    cur
-  );
-  if(key === null) return; // キャンセル
-  setFinnhubKey(key);
-  const btn = document.getElementById('finnhubBtn');
-  if(btn) btn.style.color = key.trim() ? '#22c55e' : '#f59e0b';
-}
 
 function showToast(msg,isError){
   const t=document.getElementById('toast');
@@ -3198,7 +3132,6 @@ function renderAll(){
   const tab = activeTab();
   if(tab==='history') renderHistoryTab();
   if(tab==='watch')   renderWatchTab();
-  if(tab==='virtual') renderVirtualTab();
 }
 
 // ═══════════════════════════════
@@ -3219,11 +3152,6 @@ if(!fxRates.USD) fxRates.USD=157.0;
   if(localStorage.getItem('privacy_mode')==='1'){ privacyMode=true; document.body.classList.add('privacy-mode'); const pb=document.getElementById('privacyBtn'); if(pb) pb.textContent='🙈 金額非表示中'; }
 if(!fxRates.HKD) fxRates.HKD=20.1;
 if(!fxRates.BTC) fxRates.BTC=null;  // 未取得はnullのまま（デフォルト値で誤魔化さない）
-// Finnhubキーが設定済みならボタンを緑色に
-(function(){
-  const btn = document.getElementById('finnhubBtn');
-  if(btn && getFinnhubKey()) btn.style.color = '#22c55e';
-})();
 if(!fxRates.ETH) fxRates.ETH=null;
 if(!fxRates.XRP) fxRates.XRP=null;
 
@@ -3250,297 +3178,6 @@ window._auth.onAuthStateChanged(function(user) {
   if(saved && saved !== 'dashboard') switchTab(saved);
 })();
 
-// ═══════════════════════════════
-//  仮想トレード
-// ═══════════════════════════════
-let virtualPositions = [];
-const VIRTUAL_KEY = 'portfolio_v6_virtual';
-
-function saveVirtualData() { localStorage.setItem(VIRTUAL_KEY, JSON.stringify(virtualPositions)); }
-function loadVirtualData() {
-  try { const d = localStorage.getItem(VIRTUAL_KEY); if(d) virtualPositions = JSON.parse(d); } catch(e){}
-}
-
-function autoFillVirtualPrices(val) {
-  const price = parseFloat(val);
-  if(!price || price <= 0) return;
-  const tgt = document.getElementById('vTargetPrice');
-  const sl  = document.getElementById('vStopLoss');
-  // 手動で変えていない（空か自動計算値に近い）場合のみ上書き
-  tgt.value = Math.round(price * 1.10);
-  sl.value  = Math.round(price * 0.95);
-}
-
-function openVirtualAddModal(id) {
-  const ov = document.getElementById('virtualModalOverlay');
-  ov.classList.add('open');
-  if(id) {
-    const p = virtualPositions.find(x=>x.id===id);
-    if(!p) return;
-    document.getElementById('vEditId').value = id;
-    document.getElementById('vName').value = p.name||'';
-    document.getElementById('vTicker').value = p.ticker||'';
-    document.getElementById('vCurrency').value = p.currency||'JPY';
-    document.getElementById('vBuyDate').value = p.buyDate||'';
-    document.getElementById('vBuyPrice').value = p.buyPrice||'';
-    document.getElementById('vQty').value = p.qty||'';
-    document.getElementById('vCurrentPrice').value = p.currentPrice||'';
-    document.getElementById('vTargetPrice').value = p.targetPrice||'';
-    document.getElementById('vStopLoss').value = p.stopLoss||'';
-    document.getElementById('vNote').value = p.note||'';
-  } else {
-    document.getElementById('vEditId').value = '';
-    ['vName','vTicker','vBuyDate','vBuyPrice','vQty','vCurrentPrice','vTargetPrice','vStopLoss','vNote'].forEach(id=>{ document.getElementById(id).value=''; });
-    document.getElementById('vCurrency').value = 'JPY';
-    document.getElementById('vBuyDate').value = new Date().toISOString().slice(0,10);
-  }
-}
-function closeVirtualModal() { document.getElementById('virtualModalOverlay').classList.remove('open'); }
-
-function saveVirtualPosition() {
-  const id = document.getElementById('vEditId').value || ('v'+Date.now().toString(36));
-  const buyPrice = parseFloat(document.getElementById('vBuyPrice').value)||0;
-  const pos = {
-    id,
-    name:         document.getElementById('vName').value.trim(),
-    ticker:       document.getElementById('vTicker').value.trim(),
-    currency:     document.getElementById('vCurrency').value,
-    buyDate:      document.getElementById('vBuyDate').value,
-    buyPrice,
-    qty:          parseFloat(document.getElementById('vQty').value)||0,
-    currentPrice: parseFloat(document.getElementById('vCurrentPrice').value)||null,
-    targetPrice:  parseFloat(document.getElementById('vTargetPrice').value)||(buyPrice*1.1),
-    stopLoss:     parseFloat(document.getElementById('vStopLoss').value)||(buyPrice*0.95),
-    note:         document.getElementById('vNote').value.trim(),
-    updatedAt:    new Date().toISOString(),
-  };
-  const idx = virtualPositions.findIndex(x=>x.id===id);
-  if(idx>=0) virtualPositions[idx]=pos; else virtualPositions.push(pos);
-  saveVirtualData(); closeVirtualModal(); renderVirtualTab();
-  showToast('✅ 仮想ポジションを保存しました');
-}
-
-function deleteVirtualPosition(id) {
-  if(!confirm('このポジションを削除しますか？')) return;
-  virtualPositions = virtualPositions.filter(x=>x.id!==id);
-  saveVirtualData(); renderVirtualTab();
-}
-
-function getVirtualStatus(p) {
-  if(!p.currentPrice) return {label:'価格未取得', color:'var(--text-muted)', icon:'⚪'};
-  const pct = (p.currentPrice - p.buyPrice) / p.buyPrice * 100;
-  if(p.currentPrice <= p.stopLoss) return {label:'🔴 損切り検討', color:'var(--danger)', icon:'🔴', pct};
-  if(p.currentPrice >= p.targetPrice) return {label:'🟢 目標達成！', color:'var(--accent)', icon:'🟢', pct};
-  return {label:'🟡 保有継続', color:'#f59e0b', icon:'🟡', pct};
-}
-
-function renderVirtualTab() {
-  const el = document.getElementById('virtualContent');
-  if(!el) return;
-  if(!virtualPositions.length) {
-    el.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:48px 20px">仮想ポジションがありません<br><span style="font-size:12px">「＋ 仮想ポジション追加」から登録してください</span></div>';
-    return;
-  }
-  const fmt = (n,cur) => {
-    if(!n) return '—';
-    if(cur==='USD') return '$'+n.toLocaleString('en-US',{maximumFractionDigits:2});
-    return '¥'+Math.round(n).toLocaleString('ja-JP');
-  };
-  const fmtPct = n => n==null?'—':(n>=0?'+':'')+n.toFixed(2)+'%';
-
-  const rows = virtualPositions.map(p => {
-    const st = getVirtualStatus(p);
-    const pct = st.pct;
-    const totalCost = p.buyPrice * p.qty;
-    const totalNow = p.currentPrice ? p.currentPrice * p.qty : null;
-    const pl = totalNow ? totalNow - totalCost : null;
-    // 目標まで / 損切りまでの進捗バー
-    const range = p.targetPrice - p.stopLoss;
-    const cur = p.currentPrice || p.buyPrice;
-    const prog = Math.min(100, Math.max(0, (cur - p.stopLoss) / range * 100));
-    const barColor = cur <= p.stopLoss ? 'var(--danger)' : cur >= p.targetPrice ? 'var(--accent)' : '#f59e0b';
-
-    return `<div class="watch-card" style="margin-bottom:14px">
-      <div class="watch-card-header">
-        <div>
-          <span style="font-weight:700;font-size:14px">${p.name}</span>
-          <span class="mono" style="font-size:11px;color:var(--text-muted);margin-left:8px">${p.ticker}</span>
-          <span style="font-size:11px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,.07);margin-left:6px">${p.currency}</span>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span style="font-size:13px;font-weight:700;color:${st.color}">${st.label}</span>
-          <button onclick="openVirtualAddModal('${p.id}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--text-muted)">編集</button>
-          <button onclick="deleteVirtualPosition('${p.id}')" style="background:none;border:1px solid var(--danger);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--danger)">削除</button>
-        </div>
-      </div>
-      <div style="padding:14px 16px">
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px">
-          <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">仮想購入価格</div>
-               <div class="mono" style="font-size:14px;font-weight:600">${fmt(p.buyPrice,p.currency)}</div>
-               <div style="font-size:10px;color:var(--text-muted)">${p.qty}株 / ${p.buyDate||'—'}</div></div>
-          <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">現在値</div>
-               <div class="mono" style="font-size:14px;font-weight:600;color:${pct>=0?'var(--accent)':'var(--danger)'}">${fmt(p.currentPrice,p.currency)}</div>
-               <div style="font-size:11px;color:${pct>=0?'var(--accent)':'var(--danger)'};font-weight:600">${fmtPct(pct)}</div></div>
-          <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">損益（仮想）</div>
-               <div class="mono" style="font-size:14px;font-weight:600;color:${pl>=0?'var(--accent)':'var(--danger)'}">${fmt(pl,p.currency)}</div></div>
-          <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">目標 / 損切り</div>
-               <div class="mono" style="font-size:12px">${fmt(p.targetPrice,p.currency)}</div>
-               <div class="mono" style="font-size:12px;color:var(--danger)">${fmt(p.stopLoss,p.currency)}</div></div>
-        </div>
-        <!-- 進捗バー：損切り〜目標 -->
-        <div style="margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-bottom:3px">
-            <span>損切り ${fmt(p.stopLoss,p.currency)}</span><span>目標 ${fmt(p.targetPrice,p.currency)}</span>
-          </div>
-          <div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden">
-            <div style="height:100%;width:${prog}%;background:${barColor};border-radius:3px;transition:width .3s"></div>
-          </div>
-        </div>
-        ${p.note?`<div style="font-size:11px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:8px">📝 ${p.note}</div>`:''}
-      </div>
-    </div>`;
-  }).join('');
-
-  // サマリー行
-  const total = virtualPositions.length;
-  const st_ok = virtualPositions.filter(p=>{ const s=getVirtualStatus(p); return s.icon==='🟡'; }).length;
-  const st_target = virtualPositions.filter(p=>{ const s=getVirtualStatus(p); return s.icon==='🟢'; }).length;
-  const st_stop = virtualPositions.filter(p=>{ const s=getVirtualStatus(p); return s.icon==='🔴'; }).length;
-  const summary = `<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-    <div class="watch-stat" style="flex:1;min-width:120px"><div class="watch-stat-label">ポジション数</div><div class="watch-stat-val">${total}</div></div>
-    <div class="watch-stat" style="flex:1;min-width:120px"><div class="watch-stat-label">🟡 保有継続</div><div class="watch-stat-val" style="color:#f59e0b">${st_ok}</div></div>
-    <div class="watch-stat" style="flex:1;min-width:120px"><div class="watch-stat-label">🟢 目標達成</div><div class="watch-stat-val" style="color:var(--accent)">${st_target}</div></div>
-    <div class="watch-stat" style="flex:1;min-width:120px"><div class="watch-stat-label">🔴 損切り検討</div><div class="watch-stat-val" style="color:var(--danger)">${st_stop}</div></div>
-  </div>`;
-  el.innerHTML = summary + rows;
-}
-
-async function fetchVirtualPrices() {
-  if(!virtualPositions.length) { showToast('⚠️ 仮想ポジションがありません', true); return; }
-  const btn = document.getElementById('virtualPriceBtn');
-  if(btn) { btn.textContent='⏳ 取得中...'; btn.classList.add('btn-loading'); }
-  const targets = virtualPositions.filter(p=>p.ticker);
-  let ok=0, fail=0;
-  await Promise.all(targets.map(async p => {
-    const sym = toYahooSymbol({ticker:p.ticker, currency:p.currency});
-    if(!sym) { fail++; return; }
-    const isUS = p.currency==='USD' && !/^\d/.test(sym);
-    let price = null;
-    if(isUS && getFinnhubKey()) price = await finnhubFetch(sym);
-    if(price===null) price = await yahooFetch(sym);
-        if(price!==null) { p.currentPrice=price; p.updatedAt=new Date().toISOString(); ok++; }
-    else fail++;
-  }));
-  saveVirtualData(); renderVirtualTab();
-  if(btn) { btn.textContent='📡 株価更新'; btn.classList.remove('btn-loading'); }
-  showToast(fail>0 ? `✅ ${ok}件更新 / ⚠️ ${fail}件失敗` : `✅ ${ok}件すべて更新`);
-}
-
-// ═══════════════════════════════════
-//  Coworkインポート
-// ═══════════════════════════════════
-async function importFromClipboard() {
-  const btn = document.getElementById('coworkPasteBtn');
-  if(btn) btn.textContent = '⏳ 読み込み中...';
-  try {
-    const text = await navigator.clipboard.readText();
-    if(!text || !text.trim()) {
-      showToast('⚠️ クリップボードが空です', true);
-      if(btn) btn.textContent = '📋 Coworkから貼り付け';
-      return;
-    }
-    let data;
-    try { data = JSON.parse(text.trim()); } catch(e) {
-      showToast('❌ クリップボードの内容がJSONではありません', true);
-      if(btn) btn.textContent = '📋 Coworkから貼り付け';
-      return;
-    }
-    processCoworkImport(data);
-  } catch(e) {
-    // クリップボード権限が拒否された場合はファイル選択にフォールバック
-    showToast('⚠️ クリップボードへのアクセスが拒否されました。📁 JSONボタンをお使いください', true);
-  }
-  if(btn) btn.textContent = '📋 Coworkから貼り付け';
-}
-
-function importFromCowork(input) {
-  const file = input.files[0];
-  if(!file) return;
-  input.value = '';
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    let data;
-    try { data = JSON.parse(e.target.result); } catch(err) {
-      showToast('❌ JSONの読み込みに失敗しました', true); return;
-    }
-    processCoworkImport(data);
-  };
-  reader.readAsText(file);
-}
-
-function processCoworkImport(data) {
-  if(!data || typeof data !== 'object') { showToast('❌ 不正なデータ形式', true); return; }
-  let added = 0, updated = 0, skipped = 0;
-  const now = new Date().toISOString();
-  const src = data.source || 'cowork';
-  const srcDate = data.updatedAt ? data.updatedAt.slice(0,10) : now.slice(0,10);
-  const memo = `[${src} ${srcDate}]`;
-
-  const positions = data.virtualPositions || [];
-  positions.forEach(item => {
-    if(!item.ticker) { skipped++; return; }
-    const ticker = item.ticker.toUpperCase();
-    const existing = virtualPositions.find(p => p.ticker.toUpperCase() === ticker);
-    if(existing) {
-      if(item.currentPrice != null) { existing.currentPrice = item.currentPrice; existing.updatedAt = now; }
-      if(item.buyPrice    != null) existing.buyPrice    = item.buyPrice;
-      if(item.targetPrice != null) existing.targetPrice = item.targetPrice;
-      if(item.stopLoss    != null) existing.stopLoss    = item.stopLoss;
-      if(item.shares      != null) existing.shares      = item.shares;
-      if(item.memo        != null) existing.memo        = item.memo;
-      if(item.name        != null) existing.name        = item.name;
-      if(item.status      != null) existing.status      = item.status;
-      updated++;
-    } else {
-      virtualPositions.push({
-        id:           Date.now() + Math.random(),
-        ticker:       ticker,
-        name:         item.name        || ticker,
-        currency:     item.currency    || 'USD',
-                shares:       item.shares      || 0,
-        buyPrice:     item.buyPrice    || 0,
-        currentPrice: item.currentPrice|| null,
-        targetPrice:  item.targetPrice || 0,
-        stopLoss:     item.stopLoss    || 0,
-        memo:         item.memo        || memo,
-        status:       item.status      || 'watching',
-        addedAt:      now,
-        updatedAt:    item.currentPrice ? now : null,
-      });
-      added++;
-    }
-  });
-
-  const watchItems = data.watchList || [];
-  watchItems.forEach(item => {
-    if(!item.ticker) return;
-    const ticker = item.ticker.toUpperCase();
-    if(!watchData.find(w => w.ticker === ticker)) {
-      watchData.push({ ticker, name: item.name||ticker, currency: item.currency||'USD', memo: item.memo||memo });
-    }
-  });
-  if(watchItems.length > 0) saveWatchData();
-
-  saveVirtualData();
-  renderVirtualTab();
-
-  const parts = [];
-  if(added)   parts.push(`${added}件追加`);
-  if(updated) parts.push(`${updated}件更新`);
-  if(skipped) parts.push(`${skipped}件スキップ`);
-  const watchMsg = watchItems.length ? ` / ウォッチ${watchItems.length}件` : '';
-  showToast(`📥 インポート完了: ${parts.join('、') || '変更なし'}${watchMsg}`);
-}
 
 </script>
 </body>
