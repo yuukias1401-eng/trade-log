@@ -1051,6 +1051,41 @@ function chartUrl(code) {
   return `https://finance.yahoo.com/quote/${code}`;
 }
 
+function toTVSymbol(code, currency) {
+  if (!code) return null;
+  const cur = (currency || 'JPY').toUpperCase();
+  if (/\.HK$/i.test(code))  return 'HKEX:' + code.replace(/\.HK$/i,'').replace(/^0+/,'');
+  if (/\.T$/i.test(code))   return 'TSE:'  + code.replace(/\.T$/i,'');
+  if (/^\d{4,5}$/.test(code)) {
+    return cur === 'HKD' ? 'HKEX:' + code.replace(/^0+/,'') : 'TSE:' + code;
+  }
+  // 米国株等はそのまま（TradingViewが自動判別）
+  return code.toUpperCase();
+}
+
+window.toggleChart = (id) => {
+  const wrap = document.getElementById('tv-' + id);
+  const btn  = document.getElementById('tv-btn-' + id);
+  if (!wrap) return;
+  const isOpen = wrap.style.display !== 'none';
+  wrap.style.display = isOpen ? 'none' : 'block';
+  btn.textContent = isOpen ? '📊 チャートを表示 ▼' : '📊 チャートを閉じる ▲';
+  if (!isOpen && !wrap.dataset.loaded) {
+    wrap.dataset.loaded = '1';
+    const s = stocks.find(s => String(s.id) === String(id));
+    if (!s) return;
+    const sym = toTVSymbol(s.code ?? s.ticker ?? '', s.currency);
+    if (sym) {
+      wrap.innerHTML = `<iframe
+        src="https://s.tradingview.com/embed-widget/mini-symbol-overview/?locale=ja#{"symbol":"${sym}","width":"100%","height":220,"dateRange":"3M","colorTheme":"dark","trendLineColor":"rgba(74,222,154,1)","underLineColor":"rgba(74,222,154,0.08)","isTransparent":true,"autosize":true}"
+        width="100%" height="220" frameborder="0" scrolling="no"
+        style="display:block;border-radius:8px"></iframe>`;
+    } else {
+      wrap.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">銘柄コードを登録するとチャートが表示されます</div>`;
+    }
+  }
+};
+
 function render() {
   const el=document.getElementById('watchlist');
   if(!stocks.length){ el.innerHTML=`<div class="empty"><div class="icon">📋</div>右下の＋から銘柄を追加してください</div>`; return; }
@@ -1073,32 +1108,51 @@ function render() {
     const fromDash = s.fromDashboard === true;
     const url=chartUrl(stockCode);
 
-    // ゲージバー計算
+    // ゲージバー計算（オーバーフロー対応版）
     let gaugeHTML='';
     if(s.loss && s.target){
-      const lo=s.loss, hi=s.target, cur=s.current;
+      const lo=s.loss, hi=s.target, cur=currentPrice;
       const range=hi-lo;
-      const fillPct=Math.min(Math.max((cur-lo)/range*100,0),100);
-      const markerPct=Math.min(Math.max((cur-lo)/range*100,0),100);
-      const toTarget=((hi-cur)/cur*100).toFixed(1);
-      const toLoss=((cur-lo)/cur*100).toFixed(1);
-      const hitTarget=cur>=hi;
-      const hitLoss=cur<=lo;
-      const alertHTML=hitTarget
-        ?`<div class="alert-badge alert-win">🔔 目標価格到達！</div>`
-        :hitLoss?`<div class="alert-badge alert-lose">🚨 損切ライン注意！</div>`:'';
+      const rawPct = range > 0 ? (cur-lo)/range*100 : 0;
+      const buyRawPct = range > 0 ? (buyPrice-lo)/range*100 : 0;
+
+      // fillは0〜100%（トラック内）で完結。markerだけ突き抜けOK
+      const fillPct   = Math.min(Math.max(rawPct, 0), 100);
+      const markerPct = Math.min(Math.max(rawPct, -2), 118); // 〜118%まで許容
+      const buyMarkerPct = Math.min(Math.max(buyRawPct, 1), 99);
+
+      const isPastTarget = rawPct >= 100;
+      const isBelowLoss  = rawPct <= 0;
+      const showBuyMark  = buyRawPct > 3 && buyRawPct < 97; // 買値マーカー表示
+
+      const toTargetAbs = Math.abs((hi-cur)/Math.abs(cur)*100).toFixed(1);
+      const toLossAbs   = Math.abs((cur-lo)/Math.abs(cur)*100).toFixed(1);
+
+      const rightLabel = isPastTarget
+        ? `<span style="color:var(--green);font-weight:700">目標超過 +${toTargetAbs}% 🎯</span>`
+        : `<span style="color:var(--blue)">目標まで +${toTargetAbs}%</span>`;
+      const leftLabel = isBelowLoss
+        ? `<span style="color:var(--red);font-weight:700">損切超過 ⚠️</span>`
+        : `<span style="color:var(--red)">損切まで -${toLossAbs}%</span>`;
+
+      const alertHTML = isPastTarget
+        ? `<div class="alert-badge alert-win">🔔 目標到達！引き上げを検討</div>`
+        : isBelowLoss ? `<div class="alert-badge alert-lose">🚨 損切ライン割れ！</div>` : '';
+
+      const fillStyle = isPastTarget
+        ? 'background:var(--green);box-shadow:0 0 8px rgba(74,222,154,.5)'
+        : 'background:linear-gradient(90deg,var(--red),var(--green))';
+
       gaugeHTML=`
         ${alertHTML}
         <div class="gauge-wrap">
           <div class="gauge-labels"><span style="color:var(--red)">損切 ¥${lo.toLocaleString()}</span><span style="color:var(--blue)">目標 ¥${hi.toLocaleString()}</span></div>
           <div class="gauge-track">
-            <div class="gauge-fill" style="width:${fillPct}%"></div>
-            <div class="gauge-marker" style="left:${markerPct}%"></div>
+            <div class="gauge-fill" style="width:${fillPct}%;${fillStyle}"></div>
+            ${showBuyMark?`<div style="position:absolute;top:-3px;left:${buyMarkerPct}%;width:2px;height:14px;background:var(--muted);border-radius:1px;transform:translateX(-50%);opacity:.6" title="購入価格 ¥${buyPrice.toLocaleString()}"></div>`:''}
+            <div class="gauge-marker" style="left:${markerPct}%;background:${isPastTarget?'var(--green)':'white'}"></div>
           </div>
-          <div class="gauge-remain">
-            <span style="color:var(--red)">損切まで -${toLoss}%</span>
-            <span style="color:var(--blue)">目標まで +${toTarget}%</span>
-          </div>
+          <div class="gauge-remain">${leftLabel}${rightLabel}</div>
         </div>`;
     }
 
@@ -1124,6 +1178,10 @@ function render() {
         <div class="sc-bar"><div class="sc-bar-label">損切ライン</div><div class="sc-bar-val col-loss">${s.loss?'¥'+s.loss.toLocaleString():'—'}</div></div>
       </div>
       ${gaugeHTML}
+      ${stockCode?`<div style="margin-bottom:8px">
+        <button id="tv-btn-${s.id}" onclick="toggleChart('${s.id}')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;text-align:left;font-family:inherit;transition:border-color .15s" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--border)'">📊 チャートを表示 ▼</button>
+        <div id="tv-${s.id}" style="display:none;margin-top:6px;border-radius:8px;overflow:hidden;background:#131722"></div>
+      </div>`:''}
       ${fromDash && !s.condChecks?.length ? '<div style="font-size:11px;color:var(--blue);background:rgba(96,165,250,.07);border:1px dashed rgba(96,165,250,.3);border-radius:8px;padding:7px 10px;margin-bottom:8px">💡 5条件・目標価格・損切ラインを設定してください</div>' : ''}
       <span class="sc-judge ${jClass}">${jLabel}</span>
       <div class="sc-cond-mini">${condDots}</div>
