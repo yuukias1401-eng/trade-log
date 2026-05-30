@@ -200,6 +200,7 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
     <button class="btn btn-sm btn-ghost" onclick="updateAllPrices()">📡 株価一括更新</button>
   </div>
   <div id="watchlist"></div>
+  <div id="allocation-section" style="display:none"></div>
 </div>
 
 <div class="container" id="tab-history" style="display:none">
@@ -1109,6 +1110,7 @@ function render() {
     </div>`;
   }).join('');
   document.getElementById('lastUpdate').textContent=new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  renderAllocation();
 }
 
 let toastTimer;
@@ -1118,6 +1120,78 @@ function showToast(msg,isErr=false){
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),3000);
 }
 window.showToast=showToast;
+
+function renderAllocation() {
+  const el = document.getElementById('allocation-section');
+  if (!el) return;
+
+  // ダッシュボードと同じlocalStorageキーを読む（同一オリジン共有）
+  let hlds = [], tgts = {}, fx = {};
+  try { const d=localStorage.getItem('portfolio_v6');         if(d) hlds=JSON.parse(d); } catch(e){}
+  try { const d=localStorage.getItem('portfolio_v6_targets'); if(d) tgts=JSON.parse(d); } catch(e){}
+  try { const d=localStorage.getItem('portfolio_v6_fx');      if(d) fx=JSON.parse(d);   } catch(e){}
+
+  if (!Object.keys(tgts).length || !hlds.length) { el.style.display='none'; return; }
+
+  // 円換算 (dashboard.html の getValJPY / getVal と同じロジック)
+  function getValJPY(h) {
+    let price = parseFloat(h.price)||0;
+    if(!price && h.currency && fx[h.currency]) price = fx[h.currency];
+    const qty = parseFloat(h.qty)||0;
+    const raw = price * qty;
+    const val = (h.isToushin || String(h.category||'').startsWith('投信')) ? raw/10000 : raw;
+    const cur = h.currency||'JPY';
+    if(cur==='JPY') return val;
+    if(cur==='USD' && fx.USD) return val*fx.USD;
+    if(cur==='HKD' && fx.HKD) return val*fx.HKD;
+    return val;
+  }
+
+  const totalJPY = hlds.reduce((s,h)=>s+getValJPY(h), 0);
+  if (totalJPY <= 0) { el.style.display='none'; return; }
+
+  // カテゴリ別集計
+  const catMap = {};
+  hlds.forEach(h => {
+    const cat = h.category||'不明';
+    catMap[cat] = (catMap[cat]||0) + getValJPY(h);
+  });
+
+  const rows = Object.entries(tgts).map(([cat, tgt]) => {
+    const actual = (catMap[cat]||0) / totalJPY * 100;
+    const diff   = actual - tgt;
+    const absDiff = Math.abs(diff);
+    const sign = diff >= 0 ? '+' : '';
+    const diffColor = absDiff < 2 ? 'var(--muted)' : diff > 0 ? 'var(--red)' : 'var(--blue)';
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:7px 8px;font-size:13px">${cat}</td>
+      <td style="padding:7px 8px;font-size:12px;text-align:right;color:var(--muted)">${tgt.toFixed(1)}%</td>
+      <td style="padding:7px 8px;font-size:13px;text-align:right;font-weight:600">${actual.toFixed(1)}%</td>
+      <td style="padding:7px 8px;font-size:13px;text-align:right;font-weight:700;color:${diffColor}">${sign}${diff.toFixed(1)}%</td>
+    </tr>`;
+  }).join('');
+
+  el.style.display = '';
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:90px">
+      <div class="card-title">📊 目標配分チェック</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border)">
+            <th style="padding:4px 8px;font-size:10px;color:var(--muted);text-align:left;font-weight:600;letter-spacing:.5px">カテゴリ</th>
+            <th style="padding:4px 8px;font-size:10px;color:var(--muted);text-align:right;font-weight:600;letter-spacing:.5px">目標</th>
+            <th style="padding:4px 8px;font-size:10px;color:var(--muted);text-align:right;font-weight:600;letter-spacing:.5px">現在</th>
+            <th style="padding:4px 8px;font-size:10px;color:var(--muted);text-align:right;font-weight:600;letter-spacing:.5px">過不足</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="margin-top:10px;font-size:10px;color:var(--muted);display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--blue);font-size:9px">▲過剰 / ▼不足</span>
+        <span>総資産 ¥${Math.round(totalJPY).toLocaleString()}（ダッシュボードより）</span>
+      </div>
+    </div>`;
+}
 
 </script>
 </body>
