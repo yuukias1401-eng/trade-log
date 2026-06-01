@@ -346,8 +346,28 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 <!-- ライン引き上げモーダル -->
 <div class="modal" id="adjustModal">
   <div class="modal-inner">
-    <div class="modal-title" id="adjust-title">📈 ライン引き上げ</div>
+    <div class="modal-title" id="adjust-title">📈 目標引き上げ</div>
     <div id="adjust-preview" style="margin-bottom:14px;"></div>
+    <div class="row row2">
+      <div class="fg">
+        <label>新しい目標価格 (円) *</label>
+        <input id="adj-new-target" type="number" placeholder="例: 1200" oninput="updateAdjPreview()">
+      </div>
+      <div class="fg">
+        <label>購入価格からの上昇率 (%)</label>
+        <input id="adj-new-pct" type="number" placeholder="例: 20" oninput="updateAdjFromPct()" style="color:var(--blue)">
+      </div>
+    </div>
+    <div class="row row2">
+      <div class="fg">
+        <label>損切ライン (円)</label>
+        <input id="adj-new-loss" type="number" placeholder="例: 950" oninput="updateAdjLossPreview()">
+      </div>
+      <div class="fg">
+        <label>購入価格からの下落率 (%)</label>
+        <input id="adj-loss-pct" type="number" placeholder="例: -5" oninput="updateAdjLossFromPct()" style="color:var(--red)">
+      </div>
+    </div>
     <div class="row row1">
       <div class="fg"><label>メモ（任意）</label><input id="adj-memo" placeholder="例: 高値更新したので引き上げ"></div>
     </div>
@@ -817,25 +837,67 @@ let adjustingId = null;
 window.openAdjustModal = (id) => {
   adjustingId = id;
   const s = stocks.find(s => String(s.id)===String(id));
-  const newTarget = Math.round(s.current * 1.10);
-  const newLoss   = Math.round(s.current * 0.95);
-  document.getElementById('adjust-title').textContent = `📈 ライン引き上げ — ${s.name}`;
+  document.getElementById('adjust-title').textContent = `📈 目標引き上げ — ${s.name}`;
   document.getElementById('adj-memo').value = '';
+  document.getElementById('adj-new-target').value = s.buy > 0 ? Math.round(s.buy * 1.20) : '';
+  document.getElementById('adj-new-pct').value = s.buy > 0 ? '20' : '';
+  document.getElementById('adj-new-loss').value = s.buy > 0 ? Math.round(s.buy * 0.95) : '';
+  document.getElementById('adj-loss-pct').value = s.buy > 0 ? '-5' : '';
+  const tHistory = s.targetHistory || [];
+  const tierCount = tHistory.length;
+  const tierLabel = tierCount === 0 ? '初目標' : `${tierCount}次目標`;
+  const buyPct = s.buy > 0 ? ((s.target - s.buy) / s.buy * 100).toFixed(1) : '?';
   document.getElementById('adjust-preview').innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-      <div style="background:var(--surface2);border-radius:8px;padding:10px">
-        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">目標価格</div>
-        <div style="font-size:13px;color:var(--muted);text-decoration:line-through">¥${(s.target||0).toLocaleString()}</div>
-        <div style="font-size:17px;font-weight:700;color:var(--blue)">→ ¥${newTarget.toLocaleString()}</div>
+    <div style="background:var(--surface2);border-radius:10px;padding:12px;font-size:13px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span style="color:var(--muted)">現在の目標（${tierLabel}）</span>
+        <b style="color:var(--blue)">¥${(s.target||0).toLocaleString()} <span style="font-size:11px;font-weight:400">(+${buyPct}%)</span></b>
       </div>
-      <div style="background:var(--surface2);border-radius:8px;padding:10px">
-        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">損切ライン</div>
-        <div style="font-size:13px;color:var(--muted);text-decoration:line-through">¥${(s.loss||0).toLocaleString()}</div>
-        <div style="font-size:17px;font-weight:700;color:var(--red)">→ ¥${newLoss.toLocaleString()}</div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--muted)">購入価格</span>
+        <b>¥${(s.buy||0).toLocaleString()}</b>
       </div>
-    </div>
-    <div style="font-size:11px;color:var(--muted);text-align:center">現在値 ¥${s.current.toLocaleString()} を基準に 目標+10% / 損切-5% で自動計算</div>`;
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">購入価格を基準に、次の目標価格を入力してください。<br>元の目標バーはゲージ上に残ります。</div>
+    </div>`;
   document.getElementById('adjustModal').classList.add('open');
+};
+
+window.updateAdjPreview = () => {
+  const s = stocks.find(s => String(s.id)===String(adjustingId));
+  if (!s || !s.buy) return;
+  const newTarget = parseFloat(document.getElementById('adj-new-target').value);
+  if (!isNaN(newTarget) && newTarget > 0) {
+    const pct = ((newTarget - s.buy) / s.buy * 100).toFixed(1);
+    document.getElementById('adj-new-pct').value = pct;
+  }
+};
+
+window.updateAdjFromPct = () => {
+  const s = stocks.find(s => String(s.id)===String(adjustingId));
+  if (!s || !s.buy) return;
+  const pct = parseFloat(document.getElementById('adj-new-pct').value);
+  if (!isNaN(pct)) {
+    document.getElementById('adj-new-target').value = Math.round(s.buy * (1 + pct / 100));
+  }
+};
+
+window.updateAdjLossPreview = () => {
+  const s = stocks.find(s => String(s.id)===String(adjustingId));
+  if (!s || !s.buy) return;
+  const newLoss = parseFloat(document.getElementById('adj-new-loss').value);
+  if (!isNaN(newLoss) && newLoss > 0) {
+    const pct = ((newLoss - s.buy) / s.buy * 100).toFixed(1);
+    document.getElementById('adj-loss-pct').value = pct;
+  }
+};
+
+window.updateAdjLossFromPct = () => {
+  const s = stocks.find(s => String(s.id)===String(adjustingId));
+  if (!s || !s.buy) return;
+  const pct = parseFloat(document.getElementById('adj-loss-pct').value);
+  if (!isNaN(pct)) {
+    document.getElementById('adj-new-loss').value = Math.round(s.buy * (1 + pct / 100));
+  }
 };
 window.closeAdjustModal = () => {
   document.getElementById('adjustModal').classList.remove('open');
@@ -848,16 +910,21 @@ document.getElementById('adjustModal').addEventListener('click', e => {
 window.submitAdjust = async () => {
   const s = stocks.find(s => String(s.id)===String(adjustingId));
   if(!s) return;
-  const newTarget = Math.round(s.current * 1.10);
-  const newLoss   = Math.round(s.current * 0.95);
+  const newTarget = parseFloat(document.getElementById('adj-new-target').value);
+  if (isNaN(newTarget) || newTarget <= 0) { showToast('新しい目標価格を入力してください', true); return; }
+  const newLoss = parseFloat(document.getElementById('adj-new-loss').value) || s.loss;
   const memo = document.getElementById('adj-memo').value.trim();
-  const adj = { at: Date.now(), type: 'auto', prevTarget: s.target||null, prevLoss: s.loss||null, newTarget, newLoss, memo };
+  // 古い目標をtargetHistoryに保存（ゲージ上に残すため）
+  const histEntry = { price: s.target, raisedAt: Date.now(), memo };
+  s.targetHistory = [...(s.targetHistory || []), histEntry];
+  // adjustmentsにも記録（後方互換）
+  const adj = { at: Date.now(), type: 'manual', prevTarget: s.target||null, prevLoss: s.loss||null, newTarget, newLoss, memo };
   s.adjustments = [...(s.adjustments||[]), adj];
   s.target = newTarget;
   s.loss   = newLoss;
   await saveStock(s);
   window.closeAdjustModal();
-  showToast(`✅ ライン更新（目標 ¥${newTarget.toLocaleString()} / 損切 ¥${newLoss.toLocaleString()}）`);
+  showToast(`✅ 目標引き上げ → ¥${newTarget.toLocaleString()}`);
 };
 
 window.openEditLinesModal = (id) => {
@@ -1157,83 +1224,89 @@ function render() {
     const fromDash = s.fromDashboard === true;
     const url=chartUrl(stockCode);
 
-    // ── ゲージバー（履歴対応・点線＋実線 2重表示）──
+    // ── ゲージバー（購入価格基点・複数目標ライン対応）──
     let gaugeHTML = '';
     if (s.loss && s.target) {
-      const lo  = s.loss, hi = s.target;
-      const cur = currentPrice, buy = buyPrice;
-      const hasAdj   = s.adjustments && s.adjustments.length > 0;
+      const lo  = s.loss;
+      const buy = buyPrice;
+      const cur = currentPrice;
 
-      // 元ライン（最初の引き上げ前 = 購入時の設定値）
-      const origLo   = hasAdj ? (s.adjustments[0].prevLoss   ?? lo) : lo;
-      const origHi   = hasAdj ? (s.adjustments[0].prevTarget ?? hi) : hi;
-      const showGhost = hasAdj && (Math.abs(origLo - lo) > 1 || Math.abs(origHi - hi) > 1);
+      // 目標ライン全履歴（古い順）＋現在の目標
+      const tHistory = s.targetHistory || [];
+      const allTiers = [
+        ...tHistory.map((t, i) => ({ price: t.price, label: i === 0 ? '初目標' : `${i}次`, exceeded: true })),
+        { price: s.target, label: tHistory.length === 0 ? '初目標' : `${tHistory.length}次`, exceeded: false }
+      ];
+      const maxTarget = Math.max(...allTiers.map(t => t.price));
 
-      // 座標空間: 元ライン+現ラインを両方カバー
-      const cMin = Math.min(origLo, lo);
-      const cMax = Math.max(origHi, hi);
-      const cRange = cMax - cMin;
-      const p = v => cRange > 0 ? (v - cMin) / cRange * 100 : 50;
+      // 座標空間: 損切 → 最大目標
+      const cRange = maxTarget - lo;
+      const p = v => cRange > 0 ? (v - lo) / cRange * 100 : 50;
 
-      // 現在レンジ（現損切→現目標）の塗り
-      const curL = Math.max(0, p(lo));
-      const curW = Math.max(0, p(hi) - curL);
-      // 元レンジ（灰色）の塗り
-      const origL = Math.max(0, p(origLo));
-      const origW = Math.max(0, p(origHi) - origL);
+      const buyPos = Math.max(1, Math.min(p(buy), 99));
+      const curPos = Math.max(-2, Math.min(p(cur), 116));
 
-      // 現在値マーカー（目標超過時はバー右端をオーバーフロー表示）
-      const markerP = Math.max(-2, Math.min(p(cur), 116));
-      const buyP    = Math.min(Math.max(p(buy), 0), 100);
-
-      const isPast = cur >= hi;
+      const isPast = cur >= s.target;
       const isLoss = cur <= lo;
-
-      // 購入価格からの%（ラベル用）
-      const fmtP = (v) => buy > 0 ? ((v - buy) / buy * 100).toFixed(0) : '0';
-      const origLoPct = fmtP(origLo); // e.g. "-5"
-      const origHiPct = fmtP(origHi); // e.g. "10"
-      const curLoPct  = fmtP(lo);
-      const curHiPct  = fmtP(hi);
 
       const alertHTML = isPast
         ? `<div class="alert-badge alert-win">🔔 目標到達！引き上げを検討</div>`
         : isLoss ? `<div class="alert-badge alert-lose">🚨 損切ライン割れ！</div>` : '';
 
-      // 縦ライン生成（元=灰色 / 現=白で強調）
-      const tick = (pos, color, op, z) => `<div style="position:absolute;top:-4px;left:${Math.max(0,Math.min(pos,100)).toFixed(1)}%;width:2px;height:16px;background:${color};opacity:${op};transform:translateX(-50%);border-radius:1px;z-index:${z}"></div>`;
-      const ghostTicks = showGhost ? tick(p(origLo), '#9ca3af', .85, 2) + tick(p(origHi), '#9ca3af', .85, 2) : '';
-      const curTicks   = tick(p(lo), '#fff', 1, 4) + tick(p(hi), isPast?'var(--green)':'#fff', 1, 4);
+      // ゾーン（赤: 損切〜購入 / 緑: 購入〜最大目標）
+      const redZone   = `<div style="position:absolute;top:0;left:0;width:${buyPos.toFixed(1)}%;height:100%;border-radius:4px 0 0 4px;background:rgba(248,113,113,.28)"></div>`;
+      const greenZone = `<div style="position:absolute;top:0;left:${buyPos.toFixed(1)}%;width:${(100-buyPos).toFixed(1)}%;height:100%;border-radius:0 4px 4px 0;background:rgba(74,222,154,.18)"></div>`;
 
-      // ラベル（showGhost時は 元=灰 / 現=太字 の2行）
-      const leftLabel = showGhost
-        ? `<div style="font-size:11px;line-height:1.5">
-            <span style="color:#9ca3af;font-size:10px">${origLoPct}% 損切（元）</span><br>
-            <b style="color:var(--red)">${curLoPct}% 損切</b></div>`
-        : `<span style="font-size:11px;font-weight:600;color:var(--red)">${curLoPct}% 損切</span>`;
+      // 目標ティアマーカー（超過済み=灰色 / 現在=青 or 緑）
+      const tierMarkers = allTiers.map(t => {
+        const pos = Math.max(0, Math.min(p(t.price), 100));
+        const color = t.exceeded ? '#6b7185' : (cur >= t.price ? 'var(--green)' : 'var(--blue)');
+        return `<div style="position:absolute;top:-4px;left:${pos.toFixed(1)}%;width:2px;height:16px;background:${color};transform:translateX(-50%);border-radius:1px;z-index:4"></div>`;
+      }).join('');
 
-      const rightLabel = showGhost
-        ? `<div style="font-size:11px;text-align:right;line-height:1.5">
-            <span style="color:#9ca3af;font-size:10px">+${origHiPct}% 目標（元）</span><br>
-            <b style="color:${isPast?'var(--green)':'var(--blue)'}">${isPast ? '超過🎯' : `+${curHiPct}% 目標`}</b></div>`
-        : `<span style="font-size:11px;font-weight:600;color:${isPast?'var(--green)':'var(--blue)'}">${isPast ? '超過🎯' : `+${curHiPct}% 目標`}</span>`;
+      // 損切マーカー（左端）・購入価格マーカー（ミュート）・現在値マーカー
+      const lossMarker = `<div style="position:absolute;top:-4px;left:0%;width:2px;height:16px;background:var(--red);border-radius:1px;z-index:4"></div>`;
+      const buyMarker  = `<div style="position:absolute;top:-2px;left:${buyPos.toFixed(1)}%;width:2px;height:12px;background:var(--muted);border-radius:1px;transform:translateX(-50%);opacity:.7;z-index:3" title="購入価格 ¥${buy.toLocaleString()}"></div>`;
+      const curMarker  = `<div class="gauge-marker" style="left:${curPos.toFixed(1)}%;background:${isPast?'var(--green)':'white'};z-index:5"></div>`;
+
+      // 目標ティアラベル（バー下に配置）
+      const tierLabels = allTiers.map(t => {
+        const pos = Math.max(0, Math.min(p(t.price), 100));
+        const color = t.exceeded ? '#6b7185' : (cur >= t.price ? 'var(--green)' : 'var(--blue)');
+        const pct = buy > 0 ? ((t.price - buy) / buy * 100).toFixed(0) : '?';
+        return `<span style="position:absolute;left:${pos.toFixed(1)}%;transform:translateX(-50%);color:${color};font-size:9px;white-space:nowrap;text-align:center;line-height:1.4">+${pct}%<br>${t.label}</span>`;
+      }).join('');
+
+      // 残距離ラベル
+      const lossDistNum = buy > 0 ? (cur - lo) / buy * 100 : null;
+      const tgtDistNum  = buy > 0 ? (s.target - cur) / buy * 100 : null;
+      const lossStr = lossDistNum === null ? '' : lossDistNum < 0
+        ? `<span style="font-size:11px;font-weight:600;color:var(--red)">損切割れ ${lossDistNum.toFixed(1)}%</span>`
+        : `<span style="font-size:11px;font-weight:600;color:var(--red)">損切まで ${lossDistNum.toFixed(1)}%</span>`;
+      const tgtStr = cur >= s.target
+        ? `<span style="font-size:11px;font-weight:600;color:var(--green)">目標超過 🎯</span>`
+        : tgtDistNum !== null
+          ? `<span style="font-size:11px;font-weight:600;color:var(--blue)">目標まで +${tgtDistNum.toFixed(1)}%</span>`
+          : '';
 
       gaugeHTML = `
         ${alertHTML}
         <div class="gauge-wrap">
-          <div class="gauge-labels">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px">
             <span style="color:var(--red)">損切 ¥${lo.toLocaleString()}</span>
-            <span style="color:var(--blue)">目標 ¥${hi.toLocaleString()}</span>
+            <span style="color:var(--muted)">購入 ¥${buy.toLocaleString()}</span>
+            <span style="color:${isPast?'var(--green)':'var(--blue)'}">目標 ¥${s.target.toLocaleString()}</span>
           </div>
-          <div class="gauge-track">
-            ${showGhost ? `<div style="position:absolute;top:0;left:${origL.toFixed(1)}%;width:${origW.toFixed(1)}%;height:100%;border-radius:4px;background:rgba(156,163,175,.22)"></div>` : ''}
-            <div style="position:absolute;top:0;left:${curL.toFixed(1)}%;width:${curW.toFixed(1)}%;height:100%;border-radius:4px;${isPast?'background:var(--green);box-shadow:0 0 8px rgba(74,222,154,.5)':'background:linear-gradient(90deg,var(--red),var(--green))'}"></div>
-            ${ghostTicks}
-            ${curTicks}
-            <div style="position:absolute;top:-1px;left:${buyP.toFixed(1)}%;width:2px;height:10px;background:var(--muted);border-radius:1px;transform:translateX(-50%);opacity:.5;z-index:3" title="購入価格 ¥${buy.toLocaleString()}"></div>
-            <div class="gauge-marker" style="left:${markerP.toFixed(1)}%;background:${isPast?'var(--green)':'white'};z-index:5"></div>
+          <div class="gauge-track" style="overflow:visible">
+            ${redZone}${greenZone}
+            ${lossMarker}${tierMarkers}${buyMarker}${curMarker}
           </div>
-          <div class="gauge-remain">${leftLabel}${rightLabel}</div>
+          <div style="position:relative;height:28px;margin-top:5px">
+            ${tierLabels}
+          </div>
+          <div class="gauge-remain">
+            ${lossStr}${tgtStr}
+          </div>
         </div>`;
     }
 
