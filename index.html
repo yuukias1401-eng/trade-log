@@ -361,7 +361,7 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 <!-- ライン引き上げモーダル -->
 <div class="modal" id="adjustModal">
   <div class="modal-inner">
-    <div class="modal-title" id="adjust-title">📈 目標引き上げ</div>
+    <div class="modal-title" id="adjust-title">🎯 目標・損切を変更</div>
     <div id="adjust-preview" style="margin-bottom:14px;"></div>
     <div class="row row2">
       <div class="fg">
@@ -767,6 +767,23 @@ window.showDetail = (id) => {
     <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">メモ</div>
     <textarea id="d-memo" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:13px;resize:vertical;min-height:56px;font-family:inherit;box-sizing:border-box" placeholder="メモを入力">${s.memo||''}</textarea>
 
+    ${(s.targetHistory||[]).length>0?`
+    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">目標ティア履歴 <span style="font-weight:400;color:var(--blue)">※ゲージに反映</span></div>
+      ${(s.targetHistory||[]).map((t,i)=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:11px;color:var(--muted);min-width:32px;flex-shrink:0">${i===0?'初目標':i+'次'}</span>
+          <input type="number" id="d-tier-${i}" value="${t.price||''}"
+            style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--blue);font-size:13px;font-weight:600;box-sizing:border-box;">
+          <button onclick="deleteTargetTier('${s.id}',${i})"
+            style="padding:4px 8px;border-radius:6px;border:1px solid transparent;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;flex-shrink:0"
+            title="削除">🗑</button>
+        </div>`).join('')}
+      <button onclick="saveTargetTiers('${s.id}')"
+        style="margin-top:8px;width:100%;padding:7px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:12px;cursor:pointer;font-family:inherit;">
+        💾 ティアの価格を保存
+      </button>
+    </div>`:''}
     ${(s.adjustments||[]).length>0?`
     <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px">
       <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">ライン変更履歴</div>
@@ -824,6 +841,33 @@ window.saveStockDetail = async () => {
 
 window.closeModal = () => document.getElementById('detailModal').classList.remove('open');
 
+window.deleteTargetTier = async (id, index) => {
+  const s = stocks.find(s => String(s.id) === String(id));
+  if (!s) return;
+  const tier = (s.targetHistory || [])[index];
+  if (!tier) return;
+  const label = index === 0 ? '初目標' : `${index}次目標`;
+  if (!confirm(`${label}（¥${(tier.price||0).toLocaleString()}）を削除しますか？\nゲージからも消えます。`)) return;
+  const newHistory = [...(s.targetHistory || [])];
+  newHistory.splice(index, 1);
+  s.targetHistory = newHistory;
+  await saveStock(s);
+  showToast('✅ ティアを削除しました');
+  window.showDetail(id);
+};
+
+window.saveTargetTiers = async (id) => {
+  const s = stocks.find(s => String(s.id) === String(id));
+  if (!s || !(s.targetHistory || []).length) return;
+  s.targetHistory = (s.targetHistory).map((t, i) => {
+    const val = parseFloat(document.getElementById(`d-tier-${i}`)?.value);
+    return { ...t, price: isNaN(val) ? t.price : val };
+  });
+  await saveStock(s);
+  showToast('✅ 目標ティアを保存しました');
+  window.showDetail(id);
+};
+
 window.toggleTVChart = (id) => {
   const s = stocks.find(s => String(s.id) === String(id));
   if (!s) return;
@@ -852,7 +896,7 @@ let adjustingId = null;
 window.openAdjustModal = (id) => {
   adjustingId = id;
   const s = stocks.find(s => String(s.id)===String(id));
-  document.getElementById('adjust-title').textContent = `📈 目標引き上げ — ${s.name}`;
+  document.getElementById('adjust-title').textContent = `🎯 目標・損切を変更 — ${s.name}`;
   document.getElementById('adj-memo').value = '';
   document.getElementById('adj-new-target').value = s.buy > 0 ? Math.round(s.buy * 1.20) : '';
   document.getElementById('adj-new-pct').value = s.buy > 0 ? '20' : '';
@@ -872,7 +916,7 @@ window.openAdjustModal = (id) => {
         <span style="color:var(--muted)">購入価格</span>
         <b>¥${(s.buy||0).toLocaleString()}</b>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:8px">購入価格を基準に、次の目標価格を入力してください。<br>元の目標バーはゲージ上に残ります。</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">目標を上げた場合のみ旧目標をゲージに残します。下げる/訂正の場合は履歴に追加しません。</div>
     </div>`;
   document.getElementById('adjustModal').classList.add('open');
 };
@@ -929,9 +973,11 @@ window.submitAdjust = async () => {
   if (isNaN(newTarget) || newTarget <= 0) { showToast('新しい目標価格を入力してください', true); return; }
   const newLoss = parseFloat(document.getElementById('adj-new-loss').value) || s.loss;
   const memo = document.getElementById('adj-memo').value.trim();
-  // 古い目標をtargetHistoryに保存（ゲージ上に残すため）
-  const histEntry = { price: s.target, raisedAt: Date.now(), memo };
-  s.targetHistory = [...(s.targetHistory || []), histEntry];
+  // 目標を上げた場合のみ旧目標を targetHistory に記録（ゲージに残す）
+  if (newTarget > (s.target || 0)) {
+    const histEntry = { price: s.target, raisedAt: Date.now(), memo };
+    s.targetHistory = [...(s.targetHistory || []), histEntry];
+  }
   // adjustmentsにも記録（後方互換）
   const adj = { at: Date.now(), type: 'manual', prevTarget: s.target||null, prevLoss: s.loss||null, newTarget, newLoss, memo };
   s.adjustments = [...(s.adjustments||[]), adj];
@@ -939,7 +985,7 @@ window.submitAdjust = async () => {
   s.loss   = newLoss;
   await saveStock(s);
   window.closeAdjustModal();
-  showToast(`✅ 目標引き上げ → ¥${newTarget.toLocaleString()}`);
+  showToast(`✅ 更新 → 目標 ¥${newTarget.toLocaleString()} / 損切 ¥${(newLoss||0).toLocaleString()}`);
 };
 
 window.openEditLinesModal = (id) => {
@@ -1270,6 +1316,28 @@ function fallbackLinksHTML(m) {
     `<a href="https://jp.tradingview.com/symbols/${m.tv || m.num}/" target="_blank" rel="noopener" ${aStyle}>📉 TradingView</a>` + footer;
 }
 
+// 購入日マーカーをローソク足にセット（足切り替え時に再付与）
+function _applyBuyMarker(series, buyDate, candles, isIntraday) {
+  if (!buyDate || !candles.length) { series.setMarkers([]); return; }
+  let markerTime;
+  if (isIntraday) {
+    const match = candles.find(c => {
+      const d = new Date(c.time * 1000);
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}` === buyDate;
+    });
+    markerTime = match ? match.time : candles[0].time;
+  } else {
+    const first = candles[0].time;
+    if (buyDate < first) {
+      markerTime = first; // 期間外はクランプ
+    } else {
+      const match = candles.find(c => c.time >= buyDate);
+      markerTime = match ? match.time : candles[candles.length - 1].time;
+    }
+  }
+  series.setMarkers([{ time: markerTime, position: 'belowBar', color: '#9ca3af', shape: 'arrowUp', text: '買' }]);
+}
+
 // 足ボタンのハイライトを更新
 function _updateTFButtons(toolbar, activeInterval) {
   toolbar.querySelectorAll('button[data-tf]').forEach(b => {
@@ -1289,11 +1357,15 @@ window.switchTF = async (id, interval) => {
 
   _updateTFButtons(state.toolbar, interval);
 
+  const _isId = (iv) => iv === '15m' || iv === '1h';
+
   // キャッシュがあれば即差し替え
   if (state.cache.has(interval)) {
-    state.series.setData(state.cache.get(interval));
+    const cached = state.cache.get(interval);
+    state.series.setData(cached);
     state.chart.applyOptions({ timeScale: { timeVisible: tf.timeVisible } });
     state.chart.timeScale().fitContent();
+    _applyBuyMarker(state.series, state.buyDate, cached, _isId(interval));
     state.currentInterval = interval;
     return;
   }
@@ -1317,6 +1389,7 @@ window.switchTF = async (id, interval) => {
   state.series.setData(candles);
   state.chart.applyOptions({ timeScale: { timeVisible: tf.timeVisible } });
   state.chart.timeScale().fitContent();
+  _applyBuyMarker(state.series, state.buyDate, candles, _isId(interval));
   state.currentInterval = interval;
 };
 
@@ -1385,6 +1458,7 @@ window.toggleChart = async (id) => {
     wickUpColor: '#4ade9a', wickDownColor: '#f87171', borderVisible: false,
   });
   series.setData(initCandles);
+  _applyBuyMarker(series, s.buyDate, initCandles, false); // 日足なのでイントラデイ=false
 
   if (s.buy)    series.createPriceLine({ price: s.buy,    color: '#9ca3af', lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: '買値' });
   if (s.target) series.createPriceLine({ price: s.target, color: '#60a5fa', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '目標' });
@@ -1394,7 +1468,7 @@ window.toggleChart = async (id) => {
 
   // 状態をキャッシュ
   const cache = new Map([[DEFAULT_TF, initCandles]]);
-  _chartState.set(String(id), { chart, series, cache, toolbar, code, currency: s.currency, currentInterval: DEFAULT_TF, loading: false });
+  _chartState.set(String(id), { chart, series, cache, toolbar, code, currency: s.currency, buyDate: s.buyDate, currentInterval: DEFAULT_TF, loading: false });
   _updateTFButtons(toolbar, DEFAULT_TF);
 
   // レスポンシブ: カード幅が変わったらチャート幅を追従
@@ -1497,9 +1571,13 @@ function render() {
       // 残距離ラベル
       const lossDistNum = buy > 0 ? (cur - lo) / buy * 100 : null;
       const tgtDistNum  = buy > 0 ? (s.target - cur) / buy * 100 : null;
+      const fromBuyPct  = buy > 0 ? (cur - buy) / buy * 100 : null;
       const lossStr = lossDistNum === null ? '' : lossDistNum < 0
         ? `<span style="font-size:11px;font-weight:600;color:var(--red)">損切割れ ${lossDistNum.toFixed(1)}%</span>`
         : `<span style="font-size:11px;font-weight:600;color:var(--red)">損切まで ${lossDistNum.toFixed(1)}%</span>`;
+      const fromBuyStr = fromBuyPct !== null
+        ? `<span style="font-size:11px;font-weight:700;color:${fromBuyPct >= 0 ? 'var(--green)' : 'var(--red)'}">購入から ${fromBuyPct >= 0 ? '+' : ''}${fromBuyPct.toFixed(1)}%</span>`
+        : '';
       const tgtStr = cur >= s.target
         ? `<span style="font-size:11px;font-weight:600;color:var(--green)">目標超過 🎯</span>`
         : tgtDistNum !== null
@@ -1522,7 +1600,7 @@ function render() {
             ${tierLabels}
           </div>
           <div class="gauge-remain">
-            ${lossStr}${tgtStr}
+            ${lossStr}${fromBuyStr}${tgtStr}
           </div>
         </div>`;
     }
@@ -1563,8 +1641,7 @@ function render() {
       <div class="sc-footer" style="flex-direction:column;align-items:stretch;gap:6px;">
         <div class="sc-memo">${s.memo||''}</div>
         <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-items:center;">
-          <button class="btn btn-sm" style="background:rgba(96,165,250,.15);color:var(--blue);border:1px solid rgba(96,165,250,.3);padding:5px 9px;font-size:11px;font-weight:600;border-radius:8px;cursor:pointer;" onclick="openAdjustModal('${s.id}')">📈引き上げ</button>
-          <button class="btn btn-sm btn-ghost" style="font-size:11px;padding:5px 9px;" onclick="openEditLinesModal('${s.id}')">✏️ライン設定</button>
+          <button class="btn btn-sm" style="background:rgba(96,165,250,.15);color:var(--blue);border:1px solid rgba(96,165,250,.3);padding:5px 9px;font-size:11px;font-weight:600;border-radius:8px;cursor:pointer;" onclick="openAdjustModal('${s.id}')">🎯 目標・損切</button>
           <button class="btn btn-sm btn-ghost" onclick="showDetail('${s.id}')">詳細・編集</button>
           <button class="btn btn-sm" style="background:rgba(250,204,21,.15);color:var(--yellow);border:1px solid rgba(250,204,21,.3);padding:5px 10px;font-size:12px;font-weight:500;border-radius:8px;cursor:pointer;" onclick="openSettleModal('${s.id}')">決済</button>
           <button class="btn btn-sm btn-danger" style="padding:5px 8px;" onclick="deleteStock('${s.id}')">🗑</button>
