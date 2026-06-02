@@ -33,6 +33,58 @@ push しないとスマホに反映されない。
 
 ---
 
+## 🔴 未解決バグ（最優先・調査中）：インポート保有がFirestoreで増殖＆消失
+
+### 症状
+- ダッシュボードでSBI外国株を再インポート → 直後はメモリ上に正しく入る（特定30株＋NISA1株）
+- タブを閉じて開き直すと、新規分（特定ASTS 30株）が消える
+- トレードログ側ではASTSのカードが再インポートのたびに増殖（オーファン蓄積）
+
+### 2026-06 の診断結果（重要な手がかり）
+インポート確定時の検証トースト（executeImport末尾, ≈3050行）が
+**「☁️Firestore 約55件 / メモリ 約1件」**と表示（ユーザー記憶ベース・要再確認）。
+→ Firestoreの users/{uid}/holdings に**実際の保有数(約25)を遥かに超える約55ドキュメントが蓄積**。
+→ さらに「メモリ ≈1件」が異常に少ない。保存時に holdings 配列が極小になっている疑い。
+   もしそうなら _fbSaveHoldings の削除パス(ids に無いdocを削除)が大量削除/誤動作する温床。
+
+### 既に試した対策（commit / いずれも未解決）
+- 1695c1e: インポート重複判定キーに口座(特定/NISA)追加
+- b4a900d: executeImportでFirestore保存をawait
+- ead27e9: watchlist同期に account(特定/NISA) 付与
+- 9e3aea7: _fbSaveHoldings の undefined除去・失敗を握り潰さずthrow＋トースト・_fbInit初回ロードガード
+- d6a441a: インポート保存後にFirestoreを読み戻して件数を表示する診断トースト
+
+### 次にやること（優先順）
+1. **トースト数値を正確に再確認**：インポート直後の「☁️Firestore N件 / メモリ M件」を正確にメモ。
+   さらに「閉じて開き直した直後」のholdings件数も確認。
+2. **Firebaseコンソールで users/{uid}/holdings を直接確認**：ドキュメント数、ASTSの重複有無、id体系。
+   約55件もあるならゴミが大量 → 一度コレクションを全削除して再インポートのクリーン再構築を検討。
+3. **save() 呼び出し時に holdings がサブセットになっていないか全箇所点検**：
+   silentFetchShortPrices / fetchPricesBatch / cycleHorizon / その他で holdings を
+   フィルタ結果で上書きしていないか。「メモリ1件」が出る経路を特定する。
+4. **_fbSaveHoldings の削除パスが危険**：ids に無いdocを消す設計。holdingsが一時的に小さい時に
+   走ると大量削除する。削除を保守的にする（fromImport直後は削除しない/全削除ガード）か、
+   holdingsが空/極小なら保存自体を中断するガードを入れる。
+5. オーファン一掃（watchlist側も）＋ id を「ticker+口座」など安定キーにすることも検討。
+
+### ターミナル版の分析（A/B/C・有力な残バグ候補）
+前回修正(9e3aea7/d6a441a)で「undefinedでFirestore保存が無言失敗」は解消済み。残る怪しい点：
+- **A. save() の失敗握り潰し**：save()内 `_fbSaveHoldings().catch(console.warn)` のため、
+  executeImport以外の経路（銘柄編集・削除・タグ変更など）でFirestore保存が失敗しても画面に出ない。
+  → これらの経路も失敗をユーザーに通知する／少なくともconsole.errorにする。
+- **B. NaN がundefinedチェックを通過**：parseFloatがNaNを返した古いデータがあると、
+  undefined除去では弾けず保存失敗の可能性が残る。→ 保存前サニタイズでNaN/Infinityも除去or0化する。
+- **C.（最有力）holdingsが空/極小のとき _fbSaveHoldings が呼ばれると、削除パスで
+  Firestoreのholdingsコレクションを全件削除してしまう**。今回の「☁️55件/メモリ1件」と整合。
+  → _fbSaveHoldings冒頭に「holdingsが空(または直前より極端に減少)なら削除パスをスキップ/中断」ガードを入れる。
+     これが30株消失＆カード増殖の主犯の可能性大。最優先で対処。
+
+### 関連コード（dashboard.html）
+- executeImport ≈3010-3060 / _fbSaveHoldings ≈718-745 / _fbInit ≈791-826
+- save() ≈1114 / load() ≈1121 / startAlertPolling ≈3238 / fetchPricesBatch・silentFetchShortPrices
+
+---
+
 ## 🐛 既知のバグ（要修正・優先）
 
 ### A. チャート/株価が「別の銘柄」を表示する（シンボル取り違え）
