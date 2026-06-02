@@ -171,6 +171,11 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 /* ── 引き上げ履歴 ── */
 .adj-item{display:flex;flex-direction:column;gap:3px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;}
 .adj-item:last-child{border-bottom:none;}
+
+/* ── 決済理由ボタン ── */
+.reason-btn{padding:7px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;font-family:inherit;line-height:1.4;}
+.reason-btn:hover{border-color:var(--blue);color:var(--text);}
+.reason-btn.selected{background:rgba(96,165,250,.2);border-color:var(--blue);color:var(--blue);font-weight:700;}
 </style>
 </head>
 <body>
@@ -331,7 +336,17 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
     </div>
     <div id="s-pl-preview" style="display:none;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:600;font-size:15px;"></div>
     <div class="row row1">
-      <div class="fg"><label>売った理由</label><input id="s-reason" placeholder="例: 目標価格到達、損切りライン割れ"></div>
+      <div class="fg">
+        <label>売った理由</label>
+        <div id="s-reason-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+          <button type="button" class="reason-btn" data-value="💰 利確（目標到達）" onclick="selectReason(this)">💰 利確（目標到達）</button>
+          <button type="button" class="reason-btn" data-value="🔒 トレール（高値から下落）" onclick="selectReason(this)">🔒 トレール</button>
+          <button type="button" class="reason-btn" data-value="🚨 損切（ルール通り）" onclick="selectReason(this)">🚨 損切（ルール通り）</button>
+          <button type="button" class="reason-btn" data-value="💥 前提崩壊（決算・材料）" onclick="selectReason(this)">💥 前提崩壊</button>
+          <button type="button" class="reason-btn" data-value="⏳ 時間切れ（塩漬け）" onclick="selectReason(this)">⏳ 時間切れ</button>
+          <button type="button" class="reason-btn" data-value="✏️ その他" onclick="selectReason(this)">✏️ その他</button>
+        </div>
+      </div>
     </div>
     <div class="row row1">
       <div class="fg"><label>振り返りメモ（任意）</label><textarea id="s-memo" placeholder="反省点・良かった点など"></textarea></div>
@@ -967,8 +982,17 @@ window.openSettleModal = (id) => {
   const s = stocks.find(s => String(s.id) === String(id));
   document.getElementById('s-date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('s-price').value = '';
-  document.getElementById('s-reason').value = '';
   document.getElementById('s-memo').value = '';
+  // 理由ボタンをリセットし、売りサインに応じて初期選択
+  document.querySelectorAll('#s-reason-btns .reason-btn').forEach(b => b.classList.remove('selected'));
+  const _initSign = getSellSign(s);
+  if (_initSign) {
+    const _defVal = _initSign.type === 'loss' ? '🚨 損切（ルール通り）' : _initSign.type === 'target' ? '💰 利確（目標到達）' : null;
+    if (_defVal) {
+      const _defBtn = [...document.querySelectorAll('#s-reason-btns .reason-btn')].find(b => b.dataset.value === _defVal);
+      if (_defBtn) _defBtn.classList.add('selected');
+    }
+  }
   document.getElementById('s-pl-preview').style.display = 'none';
   const buyP = s.buy ?? s.cost ?? 0;
   const curP  = s.current ?? s.price ?? buyP;
@@ -987,6 +1011,10 @@ window.openSettleModal = (id) => {
 window.closeSettleModal = () => {
   document.getElementById('settleModal').classList.remove('open');
   settlingId = null;
+};
+window.selectReason = (btn) => {
+  document.querySelectorAll('#s-reason-btns .reason-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
 };
 document.getElementById('settleModal').addEventListener('click', e => {
   if (e.target === document.getElementById('settleModal')) window.closeSettleModal();
@@ -1017,7 +1045,7 @@ window.submitSettle = async () => {
     ...s,
     sellDate: document.getElementById('s-date').value,
     sellPrice,
-    sellReason: document.getElementById('s-reason').value.trim(),
+    sellReason: (document.querySelector('#s-reason-btns .reason-btn.selected')?.dataset?.value) || '',
     sellMemo: document.getElementById('s-memo').value.trim(),
     plPct: parseFloat(plPct),
     plYen,
@@ -1202,6 +1230,20 @@ window.toggleChart = (id) => {
   }
 };
 
+function getSellSign(s) {
+  const buy = s.buy ?? s.cost ?? 0;
+  const cur = s.current ?? s.price ?? buy;
+  if (!s.target || !s.loss || !buy) return null;
+  const ach    = (cur - buy) / (s.target - buy) * 100;
+  const toTgt  = (s.target - cur) / cur * 100;
+  const toLoss = (cur - s.loss) / cur * 100;
+  if (cur <= s.loss)   return { type:'loss',   label:`🚨 損切ライン割れ → ルール通り売り`,                color:'var(--red)',    bg:'rgba(248,113,113,.15)', border:'rgba(248,113,113,.3)' };
+  if (cur >= s.target) return { type:'target', label:`💰 利確圏 → 売り or 引き上げ判断`,                  color:'var(--green)',  bg:'rgba(74,222,154,.15)',  border:'rgba(74,222,154,.3)'  };
+  if (ach >= 80)       return { type:'near',   label:`🎯 利確接近（目標まで +${toTgt.toFixed(1)}%）`,     color:'var(--yellow)', bg:'rgba(250,204,21,.15)',  border:'rgba(250,204,21,.3)'  };
+  if (cur > buy)       return { type:'hold',   label:`📈 保有継続（目標まで +${toTgt.toFixed(1)}%）`,     color:'var(--blue)',   bg:'rgba(96,165,250,.15)',  border:'rgba(96,165,250,.3)'  };
+  return               { type:'watch',  label:`👀 様子見（損切まで -${toLoss.toFixed(1)}%）`, color:'var(--muted)', bg:'var(--surface2)',       border:'var(--border)'        };
+}
+
 function render() {
   const el=document.getElementById('watchlist');
   if(!stocks.length){ el.innerHTML=`<div class="empty"><div class="icon">📋</div>右下の＋から銘柄を追加してください</div>`; return; }
@@ -1249,9 +1291,10 @@ function render() {
       const isPast = cur >= s.target;
       const isLoss = cur <= lo;
 
-      const alertHTML = isPast
-        ? `<div class="alert-badge alert-win">🔔 目標到達！引き上げを検討</div>`
-        : isLoss ? `<div class="alert-badge alert-lose">🚨 損切ライン割れ！</div>` : '';
+      const _sign = getSellSign(s);
+      const alertHTML = _sign
+        ? `<div style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;margin-bottom:8px;background:${_sign.bg};color:${_sign.color};border:1px solid ${_sign.border}">${_sign.label}</div>`
+        : '';
 
       // ゾーン（赤: 損切〜購入 / 緑: 購入〜最大目標）
       const redZone   = `<div style="position:absolute;top:0;left:0;width:${buyPos.toFixed(1)}%;height:100%;border-radius:4px 0 0 4px;background:rgba(248,113,113,.28)"></div>`;
