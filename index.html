@@ -1203,9 +1203,22 @@ function loadLightweightCharts() {
   return window._lcPromise;
 }
 
-// Yahoo Finance から日足ローソク足1年分を取得（fetchYahooPrice と同じプロキシ方式）
-async function fetchCandles(code, currency) {
+// 足の設定
+const TF_CONFIG = [
+  { label: '15分', interval: '15m', range: '5d',  timeVisible: true  },
+  { label: '1時間', interval: '1h',  range: '1mo', timeVisible: true  },
+  { label: '日',   interval: '1d',  range: '1y',  timeVisible: false },
+  { label: '週',   interval: '1wk', range: '2y',  timeVisible: false },
+  { label: '月',   interval: '1mo', range: '5y',  timeVisible: false },
+];
+const DEFAULT_TF = '1d';
+// チャート状態キャッシュ: id -> { chart, series, cache, toolbar, code, currency, currentInterval, loading }
+const _chartState = new Map();
+
+// Yahoo Finance から指定足のローソク足を取得（既存PROXIES方式）
+async function fetchCandles(code, currency, interval = '1d', range = '1y') {
   if (!code) return null;
+  const isIntraday = interval === '15m' || interval === '1h';
   let syms;
   if (/\./.test(code)) {
     syms = [code];
@@ -1218,8 +1231,8 @@ async function fetchCandles(code, currency) {
   const attempts = [];
   for (const sym of syms)
     for (const ep of [
-      `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1y&_=${cb}`,
-      `https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1y&_=${cb}`
+      `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=${interval}&range=${range}&_=${cb}`,
+      `https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=${interval}&range=${range}&_=${cb}`
     ])
       for (const mkProxy of PROXIES)
         attempts.push(
@@ -1230,11 +1243,11 @@ async function fetchCandles(code, currency) {
             const ts = result.timestamp;
             const q  = result.indicators.quote[0];
             const candles = ts.map((t, i) => {
-              const d = new Date(t * 1000);
-              return {
-                time: `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`,
-                open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i]
-              };
+              const time = isIntraday ? t : (() => {
+                const d = new Date(t * 1000);
+                return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+              })();
+              return { time, open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i] };
             }).filter(c => c.open != null && c.high != null && c.low != null && c.close != null);
             if (!candles.length) throw 0;
             return candles;
@@ -1256,6 +1269,56 @@ function fallbackLinksHTML(m) {
   return header +
     `<a href="https://jp.tradingview.com/symbols/${m.tv || m.num}/" target="_blank" rel="noopener" ${aStyle}>📉 TradingView</a>` + footer;
 }
+
+// 足ボタンのハイライトを更新
+function _updateTFButtons(toolbar, activeInterval) {
+  toolbar.querySelectorAll('button[data-tf]').forEach(b => {
+    const on = b.dataset.tf === activeInterval;
+    b.style.background  = on ? 'rgba(96,165,250,.2)' : 'transparent';
+    b.style.color       = on ? '#60a5fa' : '#6b7185';
+    b.style.borderColor = on ? '#60a5fa' : '#2a2e39';
+  });
+}
+
+// 足切り替え（ボタンから呼ばれる）
+window.switchTF = async (id, interval) => {
+  const state = _chartState.get(String(id));
+  if (!state || state.loading) return;
+  const tf = TF_CONFIG.find(t => t.interval === interval);
+  if (!tf) return;
+
+  _updateTFButtons(state.toolbar, interval);
+
+  // キャッシュがあれば即差し替え
+  if (state.cache.has(interval)) {
+    state.series.setData(state.cache.get(interval));
+    state.chart.applyOptions({ timeScale: { timeVisible: tf.timeVisible } });
+    state.chart.timeScale().fitContent();
+    state.currentInterval = interval;
+    return;
+  }
+
+  // 取得中：ボタン無効化
+  state.loading = true;
+  state.toolbar.querySelectorAll('button').forEach(b => { b.disabled = true; b.style.opacity = '.5'; });
+
+  const candles = await fetchCandles(state.code, state.currency, interval, tf.range);
+
+  state.loading = false;
+  state.toolbar.querySelectorAll('button').forEach(b => { b.disabled = false; b.style.opacity = '1'; });
+
+  if (!candles) {
+    showToast('データ取得に失敗しました', true);
+    _updateTFButtons(state.toolbar, state.currentInterval); // 前の足に戻す
+    return;
+  }
+
+  state.cache.set(interval, candles);
+  state.series.setData(candles);
+  state.chart.applyOptions({ timeScale: { timeVisible: tf.timeVisible } });
+  state.chart.timeScale().fitContent();
+  state.currentInterval = interval;
+};
 
 window.toggleChart = async (id) => {
   const wrap = document.getElementById('tv-' + id);
@@ -1279,17 +1342,33 @@ window.toggleChart = async (id) => {
 
   wrap.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">📡 チャートデータを取得中...</div>`;
 
-  let candles = null;
+  let initCandles = null;
   try {
     await loadLightweightCharts();
-    candles = await fetchCandles(code, s.currency);
+    initCandles = await fetchCandles(code, s.currency, DEFAULT_TF, '1y');
   } catch (e) {}
 
-  if (!candles) { wrap.innerHTML = fallbackLinksHTML(m); return; }
+  if (!initCandles) { wrap.innerHTML = fallbackLinksHTML(m); return; }
 
+  // DOM 構築
   wrap.innerHTML = '';
+
+  // 足切り替えツールバー
+  const toolbar = document.createElement('div');
+  toolbar.style.cssText = 'display:flex;gap:4px;padding:6px 6px 4px;background:#131722;border-radius:8px 8px 0 0;';
+  TF_CONFIG.forEach(tf => {
+    const b = document.createElement('button');
+    b.textContent = tf.label;
+    b.dataset.tf = tf.interval;
+    b.style.cssText = 'padding:4px 10px;border-radius:6px;border:1px solid #2a2e39;background:transparent;color:#6b7185;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;min-width:42px;';
+    b.onclick = () => window.switchTF(id, tf.interval);
+    toolbar.appendChild(b);
+  });
+  wrap.appendChild(toolbar);
+
+  // チャートコンテナ
   const chartEl = document.createElement('div');
-  chartEl.style.cssText = 'width:100%;height:300px;border-radius:8px;overflow:hidden';
+  chartEl.style.cssText = 'width:100%;height:300px;border-radius:0 0 8px 8px;overflow:hidden';
   wrap.appendChild(chartEl);
 
   const chart = LightweightCharts.createChart(chartEl, {
@@ -1305,13 +1384,18 @@ window.toggleChart = async (id) => {
     upColor: '#4ade9a', downColor: '#f87171',
     wickUpColor: '#4ade9a', wickDownColor: '#f87171', borderVisible: false,
   });
-  series.setData(candles);
+  series.setData(initCandles);
 
   if (s.buy)    series.createPriceLine({ price: s.buy,    color: '#9ca3af', lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: '買値' });
   if (s.target) series.createPriceLine({ price: s.target, color: '#60a5fa', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '目標' });
   if (s.loss)   series.createPriceLine({ price: s.loss,   color: '#f87171', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '損切' });
 
   chart.timeScale().fitContent();
+
+  // 状態をキャッシュ
+  const cache = new Map([[DEFAULT_TF, initCandles]]);
+  _chartState.set(String(id), { chart, series, cache, toolbar, code, currency: s.currency, currentInterval: DEFAULT_TF, loading: false });
+  _updateTFButtons(toolbar, DEFAULT_TF);
 
   // レスポンシブ: カード幅が変わったらチャート幅を追従
   const ro = new ResizeObserver(() => {
