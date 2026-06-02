@@ -2999,15 +2999,17 @@ function executeImport() {
     r.category=catSels[idx]||r.category||'その他';
     return r;
   });
-  const importNames=new Set(rowsToImport.map(r=>r.name));
+  // 重複判定キーは「銘柄名＋口座(特定/NISA)」。同一銘柄でも特定とNISAは別保有として扱う
+  const acctKey=x=>`${x.name}|${x.nisa?'NISA':'特定'}`;
+  const importKeys=new Set(rowsToImport.map(acctKey));
 
   // この証券会社の既存銘柄のうち、今回インポートに含まれないもの（売却済み）を削除
-  const removedCount=holdings.filter(h=>h.broker===importBrokerName&&!importNames.has(h.name)).length;
-  holdings=holdings.filter(h=>h.broker!==importBrokerName||importNames.has(h.name));
+  const removedCount=holdings.filter(h=>h.broker===importBrokerName&&!importKeys.has(acctKey(h))).length;
+  holdings=holdings.filter(h=>h.broker!==importBrokerName||importKeys.has(acctKey(h)));
 
   let added=0, updated=0;
   for(const r of rowsToImport){
-    const existing=holdings.find(h=>h.broker===importBrokerName&&h.name===r.name);
+    const existing=holdings.find(h=>h.broker===importBrokerName&&h.name===r.name&&(!!h.nisa===!!r.nisa));
     if(existing){
       // 数値系フィールドだけ更新し、horizon/memo/idは保持
       Object.assign(existing,{
