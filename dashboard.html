@@ -755,7 +755,8 @@ window._fbSyncWatchlist = async function(h) {
         loss:    buy ? Math.round(buy * 0.95) : null,
         current: current,
         currency: h.currency || 'JPY',
-        memo:    (h.account||'') + ' · ダッシュボードから同期',
+        account: h.nisa ? 'NISA' : '特定',
+        memo:    (h.nisa ? 'NISA口座' : '特定口座') + ' · ダッシュボードから同期',
         fromDashboard: true,
         createdAt: Date.now()
       });
@@ -768,6 +769,7 @@ window._fbSyncWatchlist = async function(h) {
         current:       current,
         currency:      h.currency || 'JPY',
         code:          h.ticker || snap.data().code || '',
+        account:       h.nisa ? 'NISA' : '特定',  // 口座区別（特定/NISA）を既存カードにも付与
         fromDashboard: true  // フラグが抜けていた旧ドキュメントにも付与
       });
     }
