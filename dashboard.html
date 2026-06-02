@@ -727,14 +727,25 @@ window._fbSaveHoldings = async function() {
     existing.docs.forEach(function(d){ if(ids.indexOf(d.id)<0) delBatch.delete(d.ref); });
     await delBatch.commit();
     // holdings保存
+    // ※ undefinedフィールドがあるとFirestoreのset()が例外を投げ、保存全体が無言で中断し
+    //   「ローカルにはあるがクラウドに無い→再オープンで消える」事故になる。必ず除去する。
     for (var i = 0; i < holdings.length; i += 400) {
       var batch = window._db.batch();
-      holdings.slice(i, i+400).forEach(function(h) { batch.set(col.doc(String(h.id)), h); });
+      holdings.slice(i, i+400).forEach(function(h) {
+        var clean = {};
+        for (var k in h) { if (h[k] !== undefined) clean[k] = h[k]; }
+        batch.set(col.doc(String(h.id)), clean);
+      });
       await batch.commit();
     }
     // fxRates・targetAllocも保存（スマホ同期用）
     await userRef.set({ fxRates: fxRates, targetAlloc: targetAlloc, updatedAt: Date.now() }, { merge: true });
-  } catch(e) { console.warn('Firestore save failed:', e); }
+  } catch(e) {
+    // 失敗を無言にしない（無言だと「保存できてるつもり」でデータを失う）
+    console.error('Firestore save failed:', e);
+    if (typeof showToast === 'function') showToast('⚠️ クラウド保存に失敗: ' + ((e && e.message) || e), true);
+    throw e;
+  }
 };
 
 window._fbSyncWatchlist = async function(h) {
@@ -798,6 +809,10 @@ window._fbInit = async function() {
     window._fbReady = true;
     console.log('[Firebase] 接続成功 ✅ uid:', window._uid);
 
+    // 初回ロード済みなら、トークン更新等で再発火してもFirestoreで上書きしない
+    // （未保存のローカル変更＝直前のインポート等を消さないため）
+    if (window._fbLoaded) { try { await window._syncAllShortToWatchlist(); } catch(e){} return; }
+
     var userRef = window._db.collection('users').doc(window._uid);
     var results = await Promise.all([userRef.collection('holdings').get(), userRef.get()]);
     var holdSnap = results[0], metaSnap = results[1];
@@ -821,6 +836,7 @@ window._fbInit = async function() {
       console.log('[Firebase] ローカルデータをFirestoreに移行中...');
       await window._fbSaveHoldings();
     }
+    window._fbLoaded = true;  // 初回ロード完了（以後は上書きしない）
     await window._syncAllShortToWatchlist();
   } catch(e) {
     console.error('[Firebase] 接続失敗 ❌:', e.code, e.message, e);
