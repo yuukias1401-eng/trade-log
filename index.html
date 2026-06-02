@@ -228,7 +228,7 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
       <div class="fg"><label>銘柄名 *</label><input id="f-name" placeholder="例: トヨタ"></div>
     </div>
     <div class="row row2">
-      <div class="fg"><label>購入日</label><input id="f-date" type="date"></div>
+      <div class="fg"><label>購入日</label><input id="f-date" type="text" inputmode="numeric" placeholder="例: 20260525" oninput="_formatDateLive(this)"></div>
       <div class="fg"><label>株数</label><input id="f-qty" type="number" placeholder="100"></div>
     </div>
     <div class="row row3">
@@ -331,7 +331,7 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
     <div class="modal-title">💰 決済記録</div>
     <div id="settle-stock-info" style="background:var(--surface2);border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;"></div>
     <div class="row row2">
-      <div class="fg"><label>決済日</label><input id="s-date" type="date"></div>
+      <div class="fg"><label>決済日</label><input id="s-date" type="text" inputmode="numeric" placeholder="例: 20260525" oninput="_formatDateLive(this)"></div>
       <div class="fg"><label>決済価格 (円) *</label><input id="s-price" type="number" placeholder="例: 3800" oninput="calcSettlePL()"></div>
     </div>
     <div id="s-pl-preview" style="display:none;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:600;font-size:15px;"></div>
@@ -595,7 +595,7 @@ window.addStock = async () => {
   const s={
     id: Date.now(), createdAt: Date.now(),
     code: document.getElementById('f-code').value.trim(), name,
-    buyDate: document.getElementById('f-date').value,
+    buyDate: window._isValidDate(document.getElementById('f-date').value) ? document.getElementById('f-date').value : '',
     qty: parseFloat(document.getElementById('f-qty').value)||null,
     buy, target: parseFloat(document.getElementById('f-target').value)||null,
     loss: parseFloat(document.getElementById('f-loss').value)||null,
@@ -636,7 +636,25 @@ window.promptPrice = async (id) => {
   showToast(`✅ ${s.name} を ¥${price.toLocaleString()} に更新`);
 };
 
+// 日付入力ヘルパー: 数字だけ打つと YYYY-MM-DD にリアルタイム整形
+window._formatDateLive = (el) => {
+  let v = el.value.replace(/\D/g, '').slice(0, 8);
+  if (v.length > 6)      v = v.slice(0,4) + '-' + v.slice(4,6) + '-' + v.slice(6);
+  else if (v.length > 4) v = v.slice(0,4) + '-' + v.slice(4);
+  el.value = v;
+};
+// YYYY-MM-DD の妥当性チェック（年2000〜2100, 月01〜12, 日01〜31）
+window._isValidDate = (str) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return false;
+  const [y, m, d] = str.split('-').map(Number);
+  return y >= 2000 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31;
+};
+
 window.setBuyDate = async (id, val) => {
+  if (val && !window._isValidDate(val)) {
+    showToast('日付の形式が正しくありません（例: 2026-05-25）', true);
+    return;
+  }
   const s=stocks.find(s=>String(s.id)===String(id));
   if(!s) return;
   s.buyDate = val || '';
@@ -1089,7 +1107,7 @@ window.submitSettle = async () => {
   const plYen = s.qty ? Math.round((sellPrice - buyPriceForSettle) * s.qty) : null;
   const historyItem = {
     ...s,
-    sellDate: document.getElementById('s-date').value,
+    sellDate: window._isValidDate(document.getElementById('s-date').value) ? document.getElementById('s-date').value : '',
     sellPrice,
     sellReason: (document.querySelector('#s-reason-btns .reason-btn.selected')?.dataset?.value) || '',
     sellMemo: document.getElementById('s-memo').value.trim(),
@@ -1628,7 +1646,7 @@ function render() {
       </div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <span style="font-size:11px;color:var(--muted);white-space:nowrap">📅 購入日</span>
-        <input type="date" value="${s.buyDate||''}" onchange="setBuyDate('${s.id}', this.value)" style="flex:1;font-size:12px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-family:inherit">
+        <input type="text" inputmode="numeric" value="${s.buyDate||''}" placeholder="20260525" oninput="_formatDateLive(this)" onblur="setBuyDate('${s.id}', this.value)" style="flex:1;font-size:12px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-family:inherit">
       </div>
       ${gaugeHTML}
       ${stockCode?`<div style="margin-bottom:8px">
