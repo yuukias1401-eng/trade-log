@@ -2988,7 +2988,7 @@ function showImportPreview(rows) {
 function importSelectAll(v){ document.querySelectorAll('.imp-row-chk').forEach(c=>c.checked=v); document.getElementById('imp-check-all').checked=v; }
 function importCheckAll(v){ importSelectAll(v); }
 
-function executeImport() {
+async function executeImport() {
   const checkedIdxs=new Set([...document.querySelectorAll('.imp-row-chk:checked')].map(c=>parseInt(c.dataset.idx)));
   const catSels=Object.fromEntries([...document.querySelectorAll('.imp-cat-sel')].map(s=>[parseInt(s.dataset.idx),s.value]));
   if(!checkedIdxs.size){ showToast('⚠️ 1件以上選択してください',true); return; }
@@ -3024,7 +3024,17 @@ function executeImport() {
       added++;
     }
   }
-  save(); renderAll(); closeImportModal();
+  // localStorage即時保存
+  localStorage.setItem('portfolio_v6', JSON.stringify(holdings));
+  localStorage.setItem('portfolio_v6_fx', JSON.stringify(fxRates));
+  localStorage.setItem('portfolio_v6_targets', JSON.stringify(targetAlloc));
+  document.getElementById('lastUpdated').textContent = '最終更新: ' + new Date().toLocaleString('ja-JP');
+  renderAll(); closeImportModal();
+  // Firestoreは完了まで待つ（投げっぱなしだとF5で新規分が永続化されず消える）
+  if (window._fbReady) {
+    try { await window._fbSaveHoldings(); }
+    catch(e){ console.warn('import save failed:', e); showToast('⚠️ クラウド保存に失敗。通信環境を確認してください', true); }
+  }
   const parts=[];
   if(updated) parts.push(`更新 ${updated}件`);
   if(added)   parts.push(`新規 ${added}件`);
