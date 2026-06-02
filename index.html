@@ -1190,44 +1190,134 @@ function chartMarket(code, currency) {
   return { market:'US', tv:code.toUpperCase() };
 }
 
-window.toggleChart = (id) => {
+// Lightweight Charts v4 を初回だけ動的ロード
+function loadLightweightCharts() {
+  if (window.LightweightCharts) return Promise.resolve();
+  if (window._lcPromise) return window._lcPromise;
+  window._lcPromise = new Promise((resolve, reject) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js';
+    sc.onload = resolve; sc.onerror = reject;
+    document.head.appendChild(sc);
+  });
+  return window._lcPromise;
+}
+
+// Yahoo Finance から日足ローソク足1年分を取得（fetchYahooPrice と同じプロキシ方式）
+async function fetchCandles(code, currency) {
+  if (!code) return null;
+  let syms;
+  if (/\./.test(code)) {
+    syms = [code];
+  } else if (/^\d{4,5}$/.test(code)) {
+    syms = (currency === 'HKD') ? [code + '.HK', code + '.T'] : [code + '.T', code + '.HK'];
+  } else {
+    syms = [code];
+  }
+  const cb = Date.now();
+  const attempts = [];
+  for (const sym of syms)
+    for (const ep of [
+      `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1y&_=${cb}`,
+      `https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1y&_=${cb}`
+    ])
+      for (const mkProxy of PROXIES)
+        attempts.push(
+          fetchWithTimeout(mkProxy(ep)).then(r => { if (!r.ok) throw 0; return r.json(); }).then(data => {
+            const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+            const result = parsed?.chart?.result?.[0];
+            if (!result) throw 0;
+            const ts = result.timestamp;
+            const q  = result.indicators.quote[0];
+            const candles = ts.map((t, i) => {
+              const d = new Date(t * 1000);
+              return {
+                time: `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`,
+                open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i]
+              };
+            }).filter(c => c.open != null && c.high != null && c.low != null && c.close != null);
+            if (!candles.length) throw 0;
+            return candles;
+          })
+        );
+  try { return await Promise.any(attempts); } catch (e) { return null; }
+}
+
+// データ取得失敗時の外部リンクフォールバック
+function fallbackLinksHTML(m) {
+  const aStyle = `style="text-decoration:none;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:12px"`;
+  const header = `<div style="padding:14px 12px;text-align:center"><div style="font-size:11px;color:var(--muted);margin-bottom:10px">データ取得に失敗しました。外部チャートで確認してください。</div><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">`;
+  const footer = `</div></div>`;
+  if (!m) return header + footer;
+  if (m.market === 'JP') return header +
+    `<a href="https://finance.yahoo.co.jp/quote/${m.num}.T" target="_blank" rel="noopener" ${aStyle}>📈 Yahoo!ファイナンス</a>` +
+    `<a href="https://kabutan.jp/stock/chart?code=${m.num}" target="_blank" rel="noopener" ${aStyle}>📊 株探</a>` +
+    `<a href="https://jp.tradingview.com/symbols/TSE-${m.num}/" target="_blank" rel="noopener" ${aStyle}>📉 TradingView</a>` + footer;
+  return header +
+    `<a href="https://jp.tradingview.com/symbols/${m.tv || m.num}/" target="_blank" rel="noopener" ${aStyle}>📉 TradingView</a>` + footer;
+}
+
+window.toggleChart = async (id) => {
   const wrap = document.getElementById('tv-' + id);
   const btn  = document.getElementById('tv-btn-' + id);
   if (!wrap) return;
   const isOpen = wrap.style.display !== 'none';
   wrap.style.display = isOpen ? 'none' : 'block';
   btn.textContent = isOpen ? '📊 チャートを表示 ▼' : '📊 チャートを閉じる ▲';
-  if (!isOpen && !wrap.dataset.loaded) {
-    wrap.dataset.loaded = '1';
-    const s = stocks.find(s => String(s.id) === String(id));
-    if (!s) return;
-    const m = chartMarket(s.code ?? s.ticker ?? '', s.currency);
-    if (!m) {
-      wrap.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">銘柄コードを登録するとチャートが表示されます</div>`;
-      return;
-    }
-    if (m.market === 'JP') {
-      // 東証はTradingView無料埋め込み不可（JPXデータライセンス）→ 外部チャートへのリンク表示
-      wrap.innerHTML = `
-        <div style="padding:14px 12px;text-align:center">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:10px">日本株はアプリ内チャート非対応のため外部で表示します</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">
-            <a href="https://finance.yahoo.co.jp/quote/${m.num}.T" target="_blank" rel="noopener" style="text-decoration:none;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:12px">📈 Yahoo!ファイナンス</a>
-            <a href="https://kabutan.jp/stock/chart?code=${m.num}" target="_blank" rel="noopener" style="text-decoration:none;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:12px">📊 株探</a>
-            <a href="https://jp.tradingview.com/symbols/TSE-${m.num}/" target="_blank" rel="noopener" style="text-decoration:none;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:12px">📉 TradingView</a>
-          </div>
-        </div>`;
-      return;
-    }
-    // US/HK は TradingView widgetembed で埋め込み（クエリパラメータ方式・確実）
-    const iframe = document.createElement('iframe');
-    iframe.src = `https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(m.tv)}&interval=D&theme=dark&style=1&locale=ja&hidesidetoolbar=1&withdateranges=1&hideideas=1&saveimage=0`;
-    iframe.style.cssText = 'display:block;width:100%;height:300px;border:0;border-radius:8px';
-    iframe.setAttribute('scrolling', 'no');
-    iframe.setAttribute('allowtransparency', 'true');
-    iframe.setAttribute('frameborder', '0');
-    wrap.appendChild(iframe);
+  if (isOpen || wrap.dataset.loaded) return;
+
+  wrap.dataset.loaded = '1';
+  const s = stocks.find(s => String(s.id) === String(id));
+  if (!s) return;
+  const code = s.code ?? s.ticker ?? '';
+  const m = chartMarket(code, s.currency);
+
+  if (!code) {
+    wrap.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">銘柄コードを登録するとチャートが表示されます</div>`;
+    return;
   }
+
+  wrap.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">📡 チャートデータを取得中...</div>`;
+
+  let candles = null;
+  try {
+    await loadLightweightCharts();
+    candles = await fetchCandles(code, s.currency);
+  } catch (e) {}
+
+  if (!candles) { wrap.innerHTML = fallbackLinksHTML(m); return; }
+
+  wrap.innerHTML = '';
+  const chartEl = document.createElement('div');
+  chartEl.style.cssText = 'width:100%;height:300px;border-radius:8px;overflow:hidden';
+  wrap.appendChild(chartEl);
+
+  const chart = LightweightCharts.createChart(chartEl, {
+    width: chartEl.clientWidth, height: 300,
+    layout: { background: { color: '#131722' }, textColor: '#d1d4dc' },
+    grid: { vertLines: { color: '#1e222d' }, horzLines: { color: '#1e222d' } },
+    timeScale: { timeVisible: false, borderColor: '#2a2e39' },
+    rightPriceScale: { borderColor: '#2a2e39' },
+    crosshair: { mode: 1 },
+  });
+
+  const series = chart.addCandlestickSeries({
+    upColor: '#4ade9a', downColor: '#f87171',
+    wickUpColor: '#4ade9a', wickDownColor: '#f87171', borderVisible: false,
+  });
+  series.setData(candles);
+
+  if (s.buy)    series.createPriceLine({ price: s.buy,    color: '#9ca3af', lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: '買値' });
+  if (s.target) series.createPriceLine({ price: s.target, color: '#60a5fa', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '目標' });
+  if (s.loss)   series.createPriceLine({ price: s.loss,   color: '#f87171', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '損切' });
+
+  chart.timeScale().fitContent();
+
+  // レスポンシブ: カード幅が変わったらチャート幅を追従
+  const ro = new ResizeObserver(() => {
+    if (wrap.style.display !== 'none') chart.applyOptions({ width: chartEl.clientWidth });
+  });
+  ro.observe(chartEl);
 };
 
 function getSellSign(s) {
