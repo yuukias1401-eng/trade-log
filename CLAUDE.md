@@ -19,17 +19,32 @@ push しないとスマホに反映されない。
 
 ## 後日やりたい（未着手）
 
-### 儲け額（金額）表示
-トレードログのカードは現状％だけで、いくら儲かっているか「金額」が無い。
-儲け額 = (現在値 − 買値) × 株数。watchlistドキュメントに buy/current/qty があるので算出可。
-- カードに「評価損益 ¥XXX」を表示（プラス緑/マイナス赤）。qtyが無い銘柄は非表示。
-- 外貨建ては円換算も出せると尚良い（fxは dashboard 側 portfolio_v6_fx 参照）。
-
 ### watchlistオーファン掃除（任意）
 インポートで保有idが変わると、持ち主のいない古いwatchlistカードが残る（ASTS3枚問題）。
 対策案: _syncAllShortToWatchlist 実行時に、fromDashboard:true かつ現在の短期保有idに
 無いwatchlistドキュメントを削除する（手動追加カード fromDashboard:false は消さない）。
 当面は手動で🗑削除で対応可。
+
+---
+
+## ✅ 2026-06 解決済み（直近修正）
+
+### Firestoreデータ消失バグ (commit a5d114a)
+- `_fbSaveHoldings` に削除スキップガードを追加:
+  - `holdings.length === 0` または `existing.size > 5 && holdings.length < existing.size / 2` のとき削除パスをスキップ + toast警告
+  - `force=true` 引数で強制削除可能（クラウド掃除ボタン用）
+- NaN/Infinity も除去するよう保存前サニタイズを強化
+- `save()` の `.catch(console.warn)` を `.catch(console.error)` に変更
+- ヘッダーに「🧹 クラウド掃除」ボタンを追加（既存55件等のゴミdocを一掃できる）
+
+### シンボル取り違えバグ (commit 2811878)
+- `fetchCandles` / `fetchYahooPrice` を通貨で単一シンボルに確定
+  - HKD → `.HK` のみ / それ以外 → `.T` のみ（競争させない）
+
+### 評価損益金額表示 (commit 02ede7e)
+- index.html カードに「評価損益 ¥XXX」を追加
+  - qty × (現在値 - 買値) で算出、外貨は portfolio_v6_fx で円換算
+  - プラス=緑 / マイナス=赤、qtyなし銘柄は非表示
 
 ---
 
@@ -106,6 +121,9 @@ push しないとスマホに反映されない。
 ---
 
 ## 完了済み（2026-06 実装）
+- ✅ Firestoreデータ消失バグ修正（commit a5d114a）… ガード追加・NaN除去・掃除ボタン
+- ✅ シンボル取り違えバグ修正（commit 2811878）… fetchCandles/fetchYahooPrice を単一シンボル化
+- ✅ 評価損益金額表示（commit 02ede7e）… index.htmlカードに ¥XXX 追加
 - ✅ 売り時サインバッジ＋決済理由の選択式（commit 829b4c0）… 下記「1.」の設計で実装済み
 - ✅ カード内ローソク足チャート 全市場対応（commit 1b76c03）… 下記「2.」の方針で実装済み。
      Yahoo chart API（query1/2 finance/chart, interval=1d&range=1y）を既存PROXIESで取得し、
