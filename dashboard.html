@@ -257,6 +257,7 @@ tr.h-short td:first-child { border-left:3px solid #f87171; }
     <button class="btn btn-ghost" onclick="exportJSON()">💾 バックアップ</button>
     <button class="btn btn-ghost" onclick="restoreJSON()">📂 復元</button>
     <button class="btn btn-ghost" onclick="takeSnapshot()">📈 推移グラフ更新</button>
+    <button class="btn btn-ghost" onclick="cleanupCloud()" title="Firestoreのゴミdocを現在のデータで上書き削除" style="font-size:11px;padding:4px 8px">🧹 クラウド掃除</button>
     <button class="btn btn-secondary" onclick="openImportModal()">📥 CSVインポート</button>
     <button class="btn btn-primary" onclick="openModal()">＋ 銘柄追加</button>
   </div>
@@ -715,25 +716,44 @@ window.googleSignOut = function() { window._auth.signOut(); };
 window._fbReady = false;
 window._uid = null;
 
-window._fbSaveHoldings = async function() {
+window._fbSaveHoldings = async function(force) {
   if (!window._fbReady || !window._uid) return;
   try {
     var userRef = window._db.collection('users').doc(window._uid);
     var col = userRef.collection('holdings');
-    // 現在holdingsにないドキュメントを削除
+    // 現在holdingsにないドキュメントを削除（安全ガード: holdings極小時はスキップ）
     var existing = await col.get();
     var ids = holdings.map(function(h){ return String(h.id); });
-    var delBatch = window._db.batch();
-    existing.docs.forEach(function(d){ if(ids.indexOf(d.id)<0) delBatch.delete(d.ref); });
-    await delBatch.commit();
-    // holdings保存
-    // ※ undefinedフィールドがあるとFirestoreのset()が例外を投げ、保存全体が無言で中断し
-    //   「ローカルにはあるがクラウドに無い→再オープンで消える」事故になる。必ず除去する。
+
+    var skipDelete = false;
+    if (!force) {
+      if (holdings.length === 0) {
+        skipDelete = true;
+        console.warn('[_fbSaveHoldings] holdingsが空のため削除パスをスキップ (Firestore:' + existing.size + '件)');
+      } else if (existing.size > 5 && holdings.length < Math.floor(existing.size / 2)) {
+        skipDelete = true;
+        console.warn('[_fbSaveHoldings] holdingsが少なすぎるため削除スキップ (Firestore:' + existing.size + '件 / メモリ:' + holdings.length + '件)');
+        if (typeof showToast === 'function') showToast('⚠️ 保有数が少ないため削除スキップ (Firestore:' + existing.size + '件/メモリ:' + holdings.length + '件)', true);
+      }
+    }
+
+    if (!skipDelete) {
+      var delBatch = window._db.batch();
+      existing.docs.forEach(function(d){ if(ids.indexOf(d.id)<0) delBatch.delete(d.ref); });
+      await delBatch.commit();
+    }
+
+    // holdings保存（undefined/NaN/Infinityを除去 → Firestore保存エラー防止）
     for (var i = 0; i < holdings.length; i += 400) {
       var batch = window._db.batch();
       holdings.slice(i, i+400).forEach(function(h) {
         var clean = {};
-        for (var k in h) { if (h[k] !== undefined) clean[k] = h[k]; }
+        for (var k in h) {
+          var v = h[k];
+          if (v === undefined) continue;
+          if (typeof v === 'number' && (isNaN(v) || !isFinite(v))) v = 0;
+          clean[k] = v;
+        }
         batch.set(col.doc(String(h.id)), clean);
       });
       await batch.commit();
@@ -1132,7 +1152,7 @@ function save() {
   localStorage.setItem('portfolio_v6_fx', JSON.stringify(fxRates));
   localStorage.setItem('portfolio_v6_targets', JSON.stringify(targetAlloc));
   document.getElementById('lastUpdated').textContent = '最終更新: ' + new Date().toLocaleString('ja-JP');
-  if (window._fbReady) window._fbSaveHoldings().catch(function(e){ console.warn(e); });
+  if (window._fbReady) window._fbSaveHoldings().catch(function(e){ console.error('Firestore保存失敗:', e); });
 }
 function load() {
   // スマホ版エクスポートの埋め込みデータを優先（iOS localStorage制限対策）
@@ -3067,6 +3087,21 @@ async function executeImport() {
     }
   } else {
     showToast('⚠️ クラウド未接続のため保存スキップ。ページ再読込→再ログインしてやり直してください', true);
+  }
+}
+
+async function cleanupCloud() {
+  if (!window._fbReady || !window._uid) { showToast('⚠️ クラウド未接続です。ログインしてください', true); return; }
+  if (!holdings.length) { showToast('⚠️ メモリ上のholdingsが空です。先にデータをロードしてください', true); return; }
+  const existing = await window._db.collection('users').doc(window._uid).collection('holdings').get();
+  if (!confirm(`Firestoreに ${existing.size} 件あります。\nメモリ上の ${holdings.length} 件で上書きし、余分なdocを削除します。\n\nよろしいですか？`)) return;
+  showToast('🧹 クラウド掃除中...');
+  try {
+    await window._fbSaveHoldings(true); // force=true でガードを無効化
+    const after = await window._db.collection('users').doc(window._uid).collection('holdings').get();
+    showToast(`✅ 掃除完了: ${existing.size}件 → ${after.size}件`);
+  } catch(e) {
+    showToast('❌ 掃除失敗: ' + ((e && e.message) || e), true);
   }
 }
 
