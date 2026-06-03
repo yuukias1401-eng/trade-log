@@ -673,13 +673,13 @@ async function fetchWithTimeout(url,ms=8000){
 
 async function fetchYahooPrice(code, currency){
   if(!code) return null;
-  // サフィックスあり（0700.HK / AAPL 等）はそのまま。4-5桁数字は取引所を判定
+  // サフィックスあり（0700.HK / AAPL 等）はそのまま。4-5桁数字は通貨で取引所を確定（競争させない）
   let syms;
   if(/\./.test(code)){
     syms=[code];
   } else if(/^\d{4,5}$/.test(code)){
-    // 香港株(HKD)は.HKを優先、それ以外は日本株.Tを優先
-    syms = (currency==='HKD') ? [code+'.HK', code+'.T'] : [code+'.T', code+'.HK'];
+    // 通貨で単一シンボルに確定: HKD→.HK / それ以外(JPY等)→.T
+    syms = [(currency==='HKD') ? code+'.HK' : code+'.T'];
   } else {
     syms=[code];
   }
@@ -1287,7 +1287,8 @@ async function fetchCandles(code, currency, interval = '1d', range = '1y') {
   if (/\./.test(code)) {
     syms = [code];
   } else if (/^\d{4,5}$/.test(code)) {
-    syms = (currency === 'HKD') ? [code + '.HK', code + '.T'] : [code + '.T', code + '.HK'];
+    // 通貨で単一シンボルに確定: HKD→.HK / それ以外(JPY等)→.T（シンボル取り違え防止）
+    syms = [(currency === 'HKD') ? code + '.HK' : code + '.T'];
   } else {
     syms = [code];
   }
