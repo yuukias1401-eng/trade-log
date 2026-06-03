@@ -1527,6 +1527,29 @@ function render() {
     const rate = buyPrice > 0 ? (diff/buyPrice*100).toFixed(2) : '0.00';
     const rc=diff>0?'up':diff<0?'down':'flat';
     const sign=diff>0?'+':'';
+    // 評価損益金額 (qty がある銘柄のみ)
+    const qty = parseFloat(s.qty) || 0;
+    let pnlHTML = '';
+    if (qty > 0 && buyPrice > 0) {
+      const pnlNative = diff * qty;
+      const currency = (s.currency || 'JPY').toUpperCase();
+      let pnlJPY = null;
+      try {
+        const fxData = localStorage.getItem('portfolio_v6_fx');
+        const fx = fxData ? JSON.parse(fxData) : {};
+        if (currency === 'JPY') pnlJPY = pnlNative;
+        else if (currency === 'USD' && fx.USD) pnlJPY = pnlNative * fx.USD;
+        else if (currency === 'HKD' && fx.HKD) pnlJPY = pnlNative * fx.HKD;
+      } catch(e) {}
+      const pnlColor = pnlNative >= 0 ? 'var(--green)' : 'var(--red)';
+      const pnlSign = pnlNative >= 0 ? '+' : '';
+      if (pnlJPY !== null) {
+        pnlHTML = `<div style="font-size:11px;color:${pnlColor};font-weight:600;margin-top:1px">${pnlSign}¥${Math.round(pnlJPY).toLocaleString()}</div>`;
+      } else if (currency !== 'JPY') {
+        const sym = currency === 'USD' ? '$' : currency === 'HKD' ? 'HK$' : currency + ' ';
+        pnlHTML = `<div style="font-size:11px;color:${pnlColor};font-weight:600;margin-top:1px">${pnlSign}${sym}${Math.abs(pnlNative).toLocaleString(undefined,{maximumFractionDigits:2})}</div>`;
+      }
+    }
     const jClass=s.judgment||'none';
     const jLabel=jClass==='green'?'🟢 買い':jClass==='yellow'?'🟡 様子見':jClass==='red'?'🔴 見送り':'— 未判定';
     const condDots=(s.condChecks||[]).map(ok=>`<span class="cond-dot ${ok?'on':'off'}"></span>`).join('');
@@ -1643,6 +1666,7 @@ function render() {
           <button style="font-size:10px;padding:2px 7px;border-radius:5px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);cursor:pointer;margin-bottom:4px;display:block;margin-left:auto" onclick="updateOnePrice('${s.id}')">📡 更新</button>
           <div class="sc-current ${rc}">¥${currentPrice.toLocaleString()}</div>
           <div class="sc-rate ${rc}">${sign}${rate}%</div>
+          ${pnlHTML}
         </div>
       </div>
       <div class="sc-bars">
