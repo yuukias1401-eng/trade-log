@@ -417,6 +417,15 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
       <div class="fg"><label>買値 *</label><input id="mh-buy" type="number" step="any" placeholder="例: 90.11" oninput="calcManualHistoryPL()"></div>
       <div class="fg"><label>売値 *</label><input id="mh-sell" type="number" step="any" placeholder="例: 113.41" oninput="calcManualHistoryPL()"></div>
     </div>
+    <div class="row row1">
+      <div class="fg"><label>通貨</label>
+        <select id="mh-currency" onchange="calcManualHistoryPL()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;font-family:inherit">
+          <option value="JPY">🇯🇵 JPY（日本円）</option>
+          <option value="USD">🇺🇸 USD（米ドル）</option>
+          <option value="HKD">🇭🇰 HKD（香港ドル）</option>
+        </select>
+      </div>
+    </div>
     <div id="mh-pl-preview" style="display:none;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:600;font-size:15px;"></div>
     <div class="row row1">
       <div class="fg">
@@ -495,7 +504,7 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
   </div>
 </div>
 
-<button class="fab" onclick="openAddModal()" title="銘柄を追加">＋</button>
+<button class="fab" id="fabBtn" onclick="openAddModal()" title="銘柄を追加">＋</button>
 
 <!-- 詳細・編集モーダル -->
 <div class="modal" id="detailModal">
@@ -621,6 +630,9 @@ window.switchTab = (tab) => {
     document.getElementById('tab-'+t).style.display = t===tab ? '' : 'none';
     document.getElementById('tab-btn-'+t).classList.toggle('active', t===tab);
   });
+  // FABはウォッチリストタブのみ表示
+  const fab = document.getElementById('fabBtn');
+  if (fab) fab.style.display = tab === 'watch' ? '' : 'none';
   if(tab==='history') renderHistory();
   if(tab==='stats') renderStats();
 };
@@ -1443,6 +1455,10 @@ function renderHistory() {
       </div>
       ${h.sellReason ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">📝 売った理由: ${h.sellReason}</div>` : ''}
       ${h.sellMemo   ? `<div style="font-size:12px;color:var(--muted);margin-top:4px">💭 ${h.sellMemo}</div>` : ''}
+      ${h.manualEntry ? `<div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">
+        <button onclick="editManualHistory('${h.id}')" style="font-size:11px;padding:3px 10px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);cursor:pointer">✏️ 編集</button>
+        <button onclick="deleteManualHistory('${h.id}')" style="font-size:11px;padding:3px 10px;border-radius:6px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--red);cursor:pointer">🗑 削除</button>
+      </div>` : ''}
     </div>`;
   }).join('');
 }
@@ -2010,21 +2026,38 @@ window.selectManualReason = (btn) => {
   document.querySelectorAll('#mh-reason-btns .reason-btn').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
 };
+function _getFxRates() {
+  try { return JSON.parse(localStorage.getItem('portfolio_v6_fx') || '{}'); } catch(e) { return {}; }
+}
+function _toJPY(native, currency) {
+  const fx = _getFxRates();
+  if (currency === 'JPY') return native;
+  if (currency === 'USD' && fx.USD) return native * fx.USD;
+  if (currency === 'HKD' && fx.HKD) return native * fx.HKD;
+  return null; // 為替未取得
+}
+function _currSym(cur) { return cur==='USD'?'$':cur==='HKD'?'HK$':'¥'; }
+
 window.calcManualHistoryPL = () => {
   const buy = parseFloat(document.getElementById('mh-buy').value);
   const sell = parseFloat(document.getElementById('mh-sell').value);
   const qty = parseFloat(document.getElementById('mh-qty').value) || null;
+  const cur = document.getElementById('mh-currency')?.value || 'JPY';
   const prev = document.getElementById('mh-pl-preview');
   if (!buy || !sell || buy <= 0 || sell <= 0) { prev.style.display='none'; return; }
   const pct = ((sell - buy) / buy * 100).toFixed(2);
   const isWin = sell >= buy;
-  const plYen = qty ? Math.round((sell - buy) * qty) : null;
   const sign = isWin ? '+' : '';
+  const diffNative = (sell - buy) * (qty || 1);
+  const diffJPY = _toJPY(diffNative, cur);
+  const sym = _currSym(cur);
+  let plStr = qty ? `${sign}${sym}${Math.abs((sell-buy)*qty).toLocaleString(undefined,{maximumFractionDigits:2})}` : '';
+  if (diffJPY !== null && cur !== 'JPY' && qty) plStr += ` (${sign}¥${Math.round(Math.abs(diffJPY)).toLocaleString()})`;
   prev.style.display = 'block';
   prev.style.background = isWin ? 'rgba(74,222,154,.1)' : 'rgba(248,113,113,.1)';
   prev.style.color = isWin ? 'var(--green)' : 'var(--red)';
   prev.style.border = `1px solid ${isWin ? 'rgba(74,222,154,.3)' : 'rgba(248,113,113,.3)'}`;
-  prev.textContent = `${isWin?'📈 利益':'📉 損失'}: ${sign}${pct}%${plYen!=null?' ('+sign+'¥'+plYen.toLocaleString()+')':''}`;
+  prev.textContent = `${isWin?'📈 利益':'📉 損失'}: ${sign}${pct}% ${plStr}`;
 };
 window.submitManualHistory = async () => {
   const name = document.getElementById('mh-name').value.trim();
@@ -2033,16 +2066,18 @@ window.submitManualHistory = async () => {
   const qty = parseFloat(document.getElementById('mh-qty').value) || null;
   const buy = parseFloat(document.getElementById('mh-buy').value);
   const sell = parseFloat(document.getElementById('mh-sell').value);
+  const cur = document.getElementById('mh-currency')?.value || 'JPY';
   const memo = document.getElementById('mh-memo').value.trim();
   const reason = document.querySelector('#mh-reason-btns .reason-btn.selected')?.dataset?.value || '';
   if (!name) { showToast('銘柄名を入力してください', true); return; }
   if (!buy || buy <= 0) { showToast('買値を入力してください', true); return; }
   if (!sell || sell <= 0) { showToast('売値を入力してください', true); return; }
   const plPct = ((sell - buy) / buy * 100).toFixed(2);
-  const plYen = qty ? Math.round((sell - buy) * qty) : null;
+  const plNative = qty ? (sell - buy) * qty : null;
+  const plYen = plNative !== null ? (_toJPY(plNative, cur) !== null ? Math.round(_toJPY(plNative, cur)) : Math.round(plNative)) : null;
   const id = 'manual_' + Date.now();
   const historyItem = {
-    id, name, code, qty, buy, sellPrice: sell, sellDate,
+    id, name, code, qty, buy, currency: cur, sellPrice: sell, sellDate,
     sellReason: reason, sellMemo: memo,
     plPct: parseFloat(plPct), plYen,
     settledAt: Date.now(), manualEntry: true
@@ -2050,6 +2085,62 @@ window.submitManualHistory = async () => {
   await setDoc(doc(db, 'history', id), historyItem);
   window.closeManualHistoryModal();
   showToast(`✅ 履歴に追加: ${name} ${parseFloat(plPct)>=0?'+':''}${plPct}%`);
+};
+window.deleteManualHistory = async (id) => {
+  if (!confirm('この履歴を削除しますか？')) return;
+  await deleteDoc(doc(db, 'history', id));
+  showToast('🗑 履歴を削除しました');
+};
+window.editManualHistory = (id) => {
+  const h = history.find(x => x.id === id);
+  if (!h) return;
+  document.getElementById('mh-name').value = h.name || '';
+  document.getElementById('mh-code').value = h.code || '';
+  document.getElementById('mh-date').value = h.sellDate || '';
+  document.getElementById('mh-qty').value = h.qty || '';
+  document.getElementById('mh-buy').value = h.buy || '';
+  document.getElementById('mh-sell').value = h.sellPrice || '';
+  document.getElementById('mh-currency').value = h.currency || 'JPY';
+  document.getElementById('mh-memo').value = h.sellMemo || '';
+  document.querySelectorAll('#mh-reason-btns .reason-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.value === h.sellReason);
+  });
+  // 編集モード：保存時に既存idを上書き
+  window._editingManualId = id;
+  document.getElementById('manualHistoryModal').classList.add('open');
+  calcManualHistoryPL();
+};
+// submitManualHistory の保存先を編集モード対応に上書き
+const _origSubmit = window.submitManualHistory;
+window.submitManualHistory = async () => {
+  if (window._editingManualId) {
+    // 編集モード: 既存ドキュメントを上書き
+    const id = window._editingManualId;
+    window._editingManualId = null;
+    const name = document.getElementById('mh-name').value.trim();
+    const code = document.getElementById('mh-code').value.trim();
+    const sellDate = document.getElementById('mh-date').value;
+    const qty = parseFloat(document.getElementById('mh-qty').value) || null;
+    const buy = parseFloat(document.getElementById('mh-buy').value);
+    const sell = parseFloat(document.getElementById('mh-sell').value);
+    const cur = document.getElementById('mh-currency')?.value || 'JPY';
+    const memo = document.getElementById('mh-memo').value.trim();
+    const reason = document.querySelector('#mh-reason-btns .reason-btn.selected')?.dataset?.value || '';
+    if (!name || !buy || !sell) { showToast('必須項目を入力してください', true); return; }
+    const plPct = ((sell - buy) / buy * 100).toFixed(2);
+    const plNative = qty ? (sell - buy) * qty : null;
+    const plYen = plNative !== null ? Math.round(_toJPY(plNative, cur) ?? plNative) : null;
+    await setDoc(doc(db, 'history', id), {
+      id, name, code, qty, buy, currency: cur, sellPrice: sell, sellDate,
+      sellReason: reason, sellMemo: memo, plPct: parseFloat(plPct), plYen,
+      settledAt: Date.now(), manualEntry: true
+    });
+    window.closeManualHistoryModal();
+    showToast(`✅ 履歴を更新: ${name}`);
+  } else {
+    window._editingManualId = null;
+    await _origSubmit();
+  }
 };
 
 let toastTimer;
