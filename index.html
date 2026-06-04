@@ -1202,26 +1202,42 @@ function renderHistory() {
     el.innerHTML = `<div class="empty"><div class="icon">📋</div>決済記録はまだありません<br><small style="margin-top:8px;display:block">銘柄カードの「決済」ボタンから記録できます</small></div>`;
     return;
   }
-  el.innerHTML = history.map(h => {
+  // 確定損益サマリー
+  const totalPL = history.reduce((s, h) => s + (h.plYen || 0), 0);
+  const wins    = history.filter(h => (h.plPct || 0) >= 0).length;
+  const losses  = history.length - wins;
+  const sumColor = totalPL >= 0 ? 'var(--green)' : 'var(--red)';
+  const summaryHTML = `<div style="background:var(--surface2);border-radius:12px;padding:14px 16px;margin-bottom:12px;border:1px solid var(--border)">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:6px">確定損益合計</div>
+    <div style="font-size:22px;font-weight:700;color:${sumColor}">${totalPL >= 0 ? '+' : ''}¥${totalPL.toLocaleString()}</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px">勝ち ${wins}件 / 負け ${losses}件</div>
+  </div>`;
+
+  el.innerHTML = summaryHTML + history.map(h => {
     const isWin = (h.plPct||0) >= 0;
     const plSign = isWin ? '+' : '';
-    const plColor = isWin ? 'var(--red)' : 'var(--green)';
-    const plYenStr = h.plYen != null ? `(${isWin?'+':''}¥${h.plYen.toLocaleString()})` : '';
+    const plColor = isWin ? 'var(--green)' : 'var(--red)';
+    const plYenBig = h.plYen != null ? `${plSign}¥${h.plYen.toLocaleString()}` : `${plSign}${h.plPct}%`;
+    const plPctSmall = h.plYen != null ? `${plSign}${h.plPct}%` : '';
+    // 部分決済バッジ（soldQty が qty と異なる場合）
+    const partialBadge = (h.soldQty != null && h.qty != null && h.soldQty !== h.qty)
+      ? `<span style="font-size:10px;background:rgba(250,204,21,.15);color:var(--yellow);border:1px solid rgba(250,204,21,.3);border-radius:6px;padding:2px 7px;font-weight:600;margin-left:6px">部分決済 ${h.soldQty}株</span>`
+      : '';
     return `<div class="hist-card">
       <div class="sc-top">
         <div>
-          <div class="sc-name">${h.name}</div>
+          <div class="sc-name">${h.name}${partialBadge}</div>
           <div class="sc-code">${h.code||'—'} · 決済日: ${h.sellDate||'—'}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:20px;font-weight:700;color:${plColor}">${plSign}${h.plPct}%</div>
-          <div style="font-size:12px;color:${plColor}">${plYenStr}</div>
+          <div style="font-size:20px;font-weight:700;color:${plColor}">${plYenBig}</div>
+          <div style="font-size:12px;color:${plColor}">${plPctSmall}</div>
         </div>
       </div>
       <div class="sc-bars">
         <div class="sc-bar"><div class="sc-bar-label">買値</div><div class="sc-bar-val col-buy">¥${(h.buy||0).toLocaleString()}</div></div>
         <div class="sc-bar"><div class="sc-bar-label">売値</div><div class="sc-bar-val" style="color:${plColor}">¥${(h.sellPrice||0).toLocaleString()}</div></div>
-        <div class="sc-bar"><div class="sc-bar-label">株数</div><div class="sc-bar-val">${h.qty||'—'}株</div></div>
+        <div class="sc-bar"><div class="sc-bar-label">株数</div><div class="sc-bar-val">${h.soldQty != null ? h.soldQty : (h.qty||'—')}株</div></div>
       </div>
       ${h.sellReason ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">📝 売った理由: ${h.sellReason}</div>` : ''}
       ${h.sellMemo   ? `<div style="font-size:12px;color:var(--muted);margin-top:4px">💭 ${h.sellMemo}</div>` : ''}
@@ -1244,7 +1260,7 @@ function renderStats() {
   const totalPL  = history.reduce((s,h) => s+(h.plYen||0), 0);
   const best     = history.reduce((a,b) => (a.plYen||0)>(b.plYen||0)?a:b);
   const worst    = history.reduce((a,b) => (a.plYen||0)<(b.plYen||0)?a:b);
-  const plColor  = totalPL >= 0 ? 'var(--red)' : 'var(--green)';
+  const plColor  = totalPL >= 0 ? 'var(--green)' : 'var(--red)';
   el.innerHTML = `
     <div class="stat-grid">
       <div class="stat-card">
