@@ -880,11 +880,15 @@ window.showDetail = (id) => {
     <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">加点条件</div>
     <div style="margin-bottom:14px">
       ${BONUS_LABELS.map((label,i) => {
-        const ok=(s.bonusChecks||[])[i];
-        return `<label style="display:flex;gap:8px;align-items:center;padding:5px 0;cursor:pointer">
-          <input type="checkbox" id="d-bonus${i}" ${ok?'checked':''} style="width:15px;height:15px">
-          <span style="font-size:12px">${label}</span>
-        </label>`;
+        const ok   = (s.bonusChecks||[])[i];
+        const note = (s.bonusNotes||[])[i] || '';
+        return `<div style="padding:5px 0">
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer">
+            <input type="checkbox" id="d-bonus${i}" ${ok?'checked':''} style="width:15px;height:15px;flex-shrink:0">
+            <span style="font-size:12px">${label}</span>
+          </label>
+          <input type="text" id="d-bonus${i}-note" value="${note.replace(/"/g,'&quot;')}" placeholder="メモ（任意）" style="margin-top:4px;margin-left:23px;width:calc(100% - 23px);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--muted);font-size:11px;font-family:inherit;box-sizing:border-box">
+        </div>`;
       }).join('')}
     </div>
 
@@ -944,13 +948,14 @@ window.saveStockDetail = async () => {
   const condChecks  = [0,1,2,3,4].map(i=>document.getElementById('d-cond'+i)?.checked||false);
   const condNotes   = [0,1,2,3,4].map(i=>document.getElementById('d-cond'+i+'-note')?.value?.trim()||'');
   const bonusChecks = [0,1,2,3].map(i=>document.getElementById('d-bonus'+i)?.checked||false);
+  const bonusNotes  = [0,1,2,3].map(i=>document.getElementById('d-bonus'+i+'-note')?.value?.trim()||'');
   const checkedCount = condChecks.filter(Boolean).length;
   s.buy    = parseFloat(document.getElementById('d-buy')?.value)    || s.buy;
   s.target = parseFloat(document.getElementById('d-target')?.value) || null;
   s.loss   = parseFloat(document.getElementById('d-loss')?.value)   || null;
   s.memo    = document.getElementById('d-memo')?.value?.trim() || '';
   s.buyDate = document.getElementById('d-buyDate')?.value?.trim() ?? s.buyDate ?? '';
-  s.condChecks=condChecks; s.condNotes=condNotes; s.bonusChecks=bonusChecks;
+  s.condChecks=condChecks; s.condNotes=condNotes; s.bonusChecks=bonusChecks; s.bonusNotes=bonusNotes;
   s.checkedCount=checkedCount;
   s.judgment = checkedCount===5?'green':checkedCount>=3?'yellow':checkedCount>0?'red':'none';
   s.updatedAt = new Date().toLocaleString('ja-JP');
