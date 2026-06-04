@@ -920,14 +920,30 @@ window.showDetail = (id) => {
     ${(s.adjustments||[]).length>0?`
     <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px">
       <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">ライン変更履歴</div>
-      ${[...(s.adjustments)].reverse().slice(0,3).map(adj=>`
-        <div class="adj-item">
-          <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
-            <span style="color:var(--muted)">${new Date(adj.at).toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
-            <span style="font-size:10px;padding:1px 6px;border-radius:8px;background:${adj.type==='auto'?'rgba(96,165,250,.15)':'rgba(167,139,250,.15)'};color:${adj.type==='auto'?'var(--blue)':'var(--purple)'};">${adj.type==='auto'?'自動':'手動'}</span>
+      ${[...(s.adjustments)].reverse().map((adj,ri)=>{
+        const origIdx = (s.adjustments.length - 1) - ri;
+        return `<div class="adj-item" id="adj-item-${s.id}-${origIdx}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="color:var(--muted);font-size:11px">${new Date(adj.at).toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
+            <div style="display:flex;gap:4px;align-items:center">
+              <span style="font-size:10px;padding:1px 6px;border-radius:8px;background:${adj.type==='auto'?'rgba(96,165,250,.15)':'rgba(167,139,250,.15)'};color:${adj.type==='auto'?'var(--blue)':'var(--purple)'};">${adj.type==='auto'?'自動':'手動'}</span>
+              <button onclick="editAdjEntry('${s.id}',${origIdx})" style="font-size:11px;padding:2px 7px;border-radius:5px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);cursor:pointer">✏️</button>
+              <button onclick="deleteAdjEntry('${s.id}',${origIdx})" style="font-size:11px;padding:2px 7px;border-radius:5px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--red);cursor:pointer">🗑</button>
+            </div>
           </div>
-          <div style="font-size:12px">目標 <b style="color:var(--blue)">¥${(adj.newTarget||0).toLocaleString()}</b> / 損切 <b style="color:var(--red)">¥${(adj.newLoss||0).toLocaleString()}</b></div>
-        </div>`).join('')}
+          <div id="adj-view-${s.id}-${origIdx}" style="font-size:12px">目標 <b style="color:var(--blue)">¥${(adj.newTarget||0).toLocaleString()}</b> / 損切 <b style="color:var(--red)">¥${(adj.newLoss||0).toLocaleString()}</b></div>
+          <div id="adj-edit-${s.id}-${origIdx}" style="display:none;margin-top:6px;display:none">
+            <div style="display:flex;gap:6px;margin-bottom:4px">
+              <div style="flex:1"><label style="font-size:10px;color:var(--muted)">目標</label><input type="number" id="adj-tgt-${s.id}-${origIdx}" value="${adj.newTarget||''}" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--blue);font-size:13px;font-weight:600;box-sizing:border-box"></div>
+              <div style="flex:1"><label style="font-size:10px;color:var(--muted)">損切</label><input type="number" id="adj-los-${s.id}-${origIdx}" value="${adj.newLoss||''}" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--red);font-size:13px;font-weight:600;box-sizing:border-box"></div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button onclick="saveAdjEntry('${s.id}',${origIdx})" style="flex:1;padding:5px;border-radius:6px;background:rgba(74,222,154,.15);border:1px solid rgba(74,222,154,.3);color:var(--green);font-size:11px;cursor:pointer;font-family:inherit">💾 保存</button>
+              <button onclick="cancelAdjEdit('${s.id}',${origIdx})" style="flex:1;padding:5px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:11px;cursor:pointer;font-family:inherit">キャンセル</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
     </div>`:''}
   `;
   updateDetailJudge();
@@ -2189,6 +2205,48 @@ window.deleteManualHistory = async (id) => {
   await deleteDoc(doc(db, 'history', id));
   showToast('🗑 履歴を削除しました');
 };
+// ── ライン変更履歴 編集・削除 ──
+window.editAdjEntry = (sid, idx) => {
+  document.getElementById(`adj-view-${sid}-${idx}`).style.display = 'none';
+  document.getElementById(`adj-edit-${sid}-${idx}`).style.display = 'block';
+};
+window.cancelAdjEdit = (sid, idx) => {
+  document.getElementById(`adj-view-${sid}-${idx}`).style.display = 'block';
+  document.getElementById(`adj-edit-${sid}-${idx}`).style.display = 'none';
+};
+window.saveAdjEntry = async (sid, idx) => {
+  const s = stocks.find(s => String(s.id) === String(sid)); if (!s) return;
+  const newTgt = parseFloat(document.getElementById(`adj-tgt-${sid}-${idx}`)?.value) || null;
+  const newLos = parseFloat(document.getElementById(`adj-los-${sid}-${idx}`)?.value) || null;
+  s.adjustments[idx].newTarget = newTgt;
+  s.adjustments[idx].newLoss   = newLos;
+  // 最新エントリなら現在の目標・損切も更新する
+  if (idx === s.adjustments.length - 1) {
+    if (newTgt) s.target = newTgt;
+    if (newLos) s.loss   = newLos;
+  }
+  await saveStock(s);
+  showToast('✅ ライン変更履歴を修正しました');
+  showDetail(sid); // 詳細モーダルを再描画
+};
+window.deleteAdjEntry = async (sid, idx) => {
+  if (!confirm('この履歴を削除しますか？')) return;
+  const s = stocks.find(s => String(s.id) === String(sid)); if (!s) return;
+  const wasLatest = idx === s.adjustments.length - 1;
+  s.adjustments.splice(idx, 1);
+  // 最新エントリを消した場合、1つ前の値を現在のライン設定として復元
+  if (wasLatest && s.adjustments.length > 0) {
+    const prev = s.adjustments[s.adjustments.length - 1];
+    if (confirm('最新の変更を削除しました。ラインを直前の値（目標¥' + (prev.newTarget||0).toLocaleString() + ' / 損切¥' + (prev.newLoss||0).toLocaleString() + '）に戻しますか？')) {
+      if (prev.newTarget) s.target = prev.newTarget;
+      if (prev.newLoss)   s.loss   = prev.newLoss;
+    }
+  }
+  await saveStock(s);
+  showToast('🗑 履歴を削除しました');
+  showDetail(sid);
+};
+
 window.toggleHistoryExclude = async (id) => {
   const h = history.find(x => x.id === id);
   if (!h) return;
