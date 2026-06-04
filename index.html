@@ -1717,7 +1717,7 @@ window.openAddCandModal = () => {
   setTimeout(()=>document.getElementById('cand-name').focus(),80);
 };
 window.closeAddCandModal = () => document.getElementById('addCandModal').classList.remove('open');
-document.getElementById('addCandModal').addEventListener('click',e=>{if(e.target===document.getElementById('addCandModal'))window.closeAddCandModal();});
+// 候補追加モーダルは枠外タップで閉じない（入力内容の誤消失防止）
 window.addCandidate = async () => {
   const name=document.getElementById('cand-name').value.trim();
   if(!name){showToast('銘柄名を入力してください',true);return;}
@@ -1744,7 +1744,7 @@ window.openBuyFromCandModal = (id) => {
   document.getElementById('buyFromCandModal').classList.add('open');
 };
 window.closeBuyFromCandModal = () => {document.getElementById('buyFromCandModal').classList.remove('open');_buyingCandId=null;};
-document.getElementById('buyFromCandModal').addEventListener('click',e=>{if(e.target===document.getElementById('buyFromCandModal'))window.closeBuyFromCandModal();});
+// 購入情報モーダルは枠外タップで閉じない（入力内容の誤消失防止）
 window.bcAutoFill = () => {
   const p=parseFloat(document.getElementById('bc-buy').value); if(!p||p<=0) return;
   document.getElementById('bc-target').value=Math.round(p*1.10);
@@ -1783,7 +1783,7 @@ window.openRejectCandModal = (id) => {
   document.getElementById('rejectCandModal').classList.add('open');
 };
 window.closeRejectCandModal = () => {document.getElementById('rejectCandModal').classList.remove('open');_rejectingCandId=null;};
-document.getElementById('rejectCandModal').addEventListener('click',e=>{if(e.target===document.getElementById('rejectCandModal'))window.closeRejectCandModal();});
+// 見送りモーダルは枠外タップで閉じない（入力内容の誤消失防止）
 window.confirmRejectCand = async () => {
   const c=candidates.find(c=>c.id===_rejectingCandId); if(!c) return;
   await updateDoc(doc(db,'candidates',String(c.id)),{
