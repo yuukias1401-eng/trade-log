@@ -194,10 +194,22 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 </header>
 
 <nav class="tabs">
-  <button class="tab-btn active" id="tab-btn-watch"   onclick="switchTab('watch')">📈 ウォッチリスト</button>
-  <button class="tab-btn"        id="tab-btn-history" onclick="switchTab('history')">📋 履歴</button>
-  <button class="tab-btn"        id="tab-btn-stats"   onclick="switchTab('stats')">📊 統計</button>
+  <button class="tab-btn"        id="tab-btn-candidates" onclick="switchTab('candidates')">📋 候補</button>
+  <button class="tab-btn active" id="tab-btn-watch"      onclick="switchTab('watch')">📈 ウォッチ</button>
+  <button class="tab-btn"        id="tab-btn-history"    onclick="switchTab('history')">📋 履歴</button>
+  <button class="tab-btn"        id="tab-btn-stats"      onclick="switchTab('stats')">📊 統計</button>
 </nav>
+
+<div class="container" id="tab-candidates" style="display:none">
+  <div class="list-header">
+    <div class="list-title">候補リスト</div>
+  </div>
+  <div id="candidateslist"></div>
+  <div id="rejected-section" style="margin-top:12px">
+    <button onclick="toggleRejectedSection()" id="rejected-toggle-btn" style="width:100%;text-align:left;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">見送り履歴 (0件) ▼</button>
+    <div id="rejectedlist" style="display:none;margin-top:8px"></div>
+  </div>
+</div>
 
 <div class="container" id="tab-watch">
   <div class="list-header">
@@ -515,7 +527,73 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
   </div>
 </div>
 
-<button class="fab" id="fabBtn" onclick="openAddModal()" title="銘柄を追加">＋</button>
+<!-- 候補追加モーダル -->
+<div class="modal" id="addCandModal">
+  <div class="modal-inner">
+    <div class="modal-title">📋 候補に追加</div>
+    <div class="row row2">
+      <div class="fg"><label>銘柄名 *</label><input id="cand-name" placeholder="例: 旭化成"></div>
+      <div class="fg"><label>銘柄コード</label><input id="cand-code" placeholder="例: 3407, AAPL"></div>
+    </div>
+    <div class="row row2">
+      <div class="fg">
+        <label>通貨</label>
+        <select id="cand-currency">
+          <option value="JPY">JPY（円）</option>
+          <option value="USD">USD（ドル）</option>
+          <option value="HKD">HKD（香港ドル）</option>
+        </select>
+      </div>
+    </div>
+    <div class="row row1">
+      <div class="fg"><label>メモ（気になった理由）</label><textarea id="cand-memo" placeholder="例: 決算好調、出来高増加中"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sm btn-ghost" onclick="closeAddCandModal()">キャンセル</button>
+      <button class="btn btn-primary" style="width:auto;padding:10px 24px;" onclick="addCandidate()">候補に追加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 購入情報入力モーダル -->
+<div class="modal" id="buyFromCandModal">
+  <div class="modal-inner">
+    <div class="modal-title">✅ 購入情報を入力</div>
+    <div id="buy-cand-info" style="background:var(--surface2);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;"></div>
+    <div class="row row2">
+      <div class="fg"><label>購入価格 *</label><input id="bc-buy" type="number" placeholder="例: 3500" oninput="bcAutoFill()"></div>
+      <div class="fg"><label>株数</label><input id="bc-qty" type="number" placeholder="例: 100"></div>
+    </div>
+    <div class="row row2">
+      <div class="fg"><label>目標価格</label><input id="bc-target" type="number" class="auto-filled" placeholder="自動入力"></div>
+      <div class="fg"><label>損切ライン</label><input id="bc-loss" type="number" class="auto-filled" placeholder="自動入力"></div>
+    </div>
+    <div class="row row1">
+      <div class="fg"><label>購入日</label><input id="bc-date" type="text" inputmode="numeric" placeholder="例: 20260604" oninput="_formatDateLive(this)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sm btn-ghost" onclick="closeBuyFromCandModal()">キャンセル</button>
+      <button class="btn btn-primary" style="width:auto;padding:10px 24px;" onclick="confirmBuyFromCand()">ウォッチリストに追加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 見送りモーダル -->
+<div class="modal" id="rejectCandModal">
+  <div class="modal-inner">
+    <div class="modal-title">❌ 見送り</div>
+    <div id="reject-cand-info" style="font-size:14px;font-weight:700;margin-bottom:14px;"></div>
+    <div class="row row1">
+      <div class="fg"><label>見送り理由（任意）</label><textarea id="reject-reason" placeholder="例: 出来高が少ない、タイミングが悪い"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sm btn-ghost" onclick="closeRejectCandModal()">キャンセル</button>
+      <button style="width:auto;padding:10px 20px;background:var(--red);color:#0d0f14;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;" onclick="confirmRejectCand()">見送りにする</button>
+    </div>
+  </div>
+</div>
+
+<button class="fab" id="fabBtn" onclick="onFabClick()" title="追加">＋</button>
 
 <!-- 詳細・編集モーダル -->
 <div class="modal" id="detailModal">
@@ -543,7 +621,7 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
@@ -559,14 +637,20 @@ const app = initializeApp(firebaseConfig);
 const db   = getFirestore(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
-const stocksCol  = collection(db, 'watchlist');
-const historyCol = collection(db, 'history');
+const stocksCol      = collection(db, 'watchlist');
+const historyCol     = collection(db, 'history');
+const candidatesCol  = collection(db, 'candidates');
 
 let stocks  = [];
 let history = [];
-let _unsubStocks    = null;
-let _unsubHistory   = null;
-let _unsubPortfolio = null;
+let candidates = [];
+let _unsubStocks      = null;
+let _unsubHistory     = null;
+let _unsubPortfolio   = null;
+let _unsubCandidates  = null;
+let _candLocalUpdate  = false;
+let _buyingCandId     = null;
+let _rejectingCandId  = null;
 
 function setSyncStatus(state) {
   const el = document.getElementById('syncStatus');
@@ -605,6 +689,14 @@ onAuthStateChanged(auth, (user) => {
     }
     // 待機資金用：ダッシュボードの保有資産（users/{uid}/holdings）をFirestoreから直接購読
     // → localStorage 依存をやめ、別デバイス・別タブの更新もリアルタイム反映
+    if (!_unsubCandidates) {
+      _unsubCandidates = onSnapshot(candidatesCol, (snapshot) => {
+        candidates = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        candidates.sort((a, b) => (b.addedAt||0) - (a.addedAt||0));
+        if (_candLocalUpdate) return;
+        if (activeTab === 'candidates') renderCandidates();
+      }, (e) => console.warn('[candidates]', e));
+    }
     if (!_unsubPortfolio) {
       const uref    = doc(db, 'users', user.uid);
       const holdCol = collection(db, 'users', user.uid, 'holdings');
@@ -626,26 +718,27 @@ onAuthStateChanged(auth, (user) => {
   } else {
     document.getElementById('loginOverlay').style.display = 'flex';
     setSyncStatus('login');
-    if (_unsubStocks)    { _unsubStocks();    _unsubStocks    = null; }
-    if (_unsubHistory)   { _unsubHistory();   _unsubHistory   = null; }
-    if (_unsubPortfolio) { _unsubPortfolio(); _unsubPortfolio = null; }
-    stocks = []; history = [];
-    render(); renderHistory(); renderStats();
+    if (_unsubStocks)      { _unsubStocks();      _unsubStocks      = null; }
+    if (_unsubHistory)     { _unsubHistory();     _unsubHistory     = null; }
+    if (_unsubPortfolio)   { _unsubPortfolio();   _unsubPortfolio   = null; }
+    if (_unsubCandidates)  { _unsubCandidates();  _unsubCandidates  = null; }
+    stocks = []; history = []; candidates = [];
+    render(); renderHistory(); renderStats(); renderCandidates();
   }
 });
 
 let activeTab = 'watch';
 window.switchTab = (tab) => {
   activeTab = tab;
-  ['watch','history','stats'].forEach(t => {
+  ['candidates','watch','history','stats'].forEach(t => {
     document.getElementById('tab-'+t).style.display = t===tab ? '' : 'none';
     document.getElementById('tab-btn-'+t).classList.toggle('active', t===tab);
   });
-  // FABはウォッチリストタブのみ表示
   const fab = document.getElementById('fabBtn');
-  if (fab) fab.style.display = tab === 'watch' ? '' : 'none';
+  if (fab) fab.style.display = (tab==='watch'||tab==='candidates') ? '' : 'none';
   if(tab==='history') renderHistory();
   if(tab==='stats') renderStats();
+  if(tab==='candidates') renderCandidates();
 };
 
 async function saveStock(s) {
@@ -1437,6 +1530,286 @@ window.importFromFile = async function(input) {
     input.value = '';
   };
   reader.readAsText(file);
+};
+
+// ──────────────────────────────────────────────
+//  候補リスト
+// ──────────────────────────────────────────────
+
+let _candChartObserver = null;
+let _rejectedOpen = false;
+
+function _jBadgeStyle(j) {
+  const base = 'padding:3px 10px;font-size:11px;border-radius:20px;font-weight:700;flex-shrink:0;white-space:nowrap;display:inline-block;';
+  if (j==='green')  return base+'background:rgba(74,222,154,.15);border:1px solid rgba(74,222,154,.3);color:var(--green);';
+  if (j==='yellow') return base+'background:rgba(250,204,21,.15);border:1px solid rgba(250,204,21,.3);color:var(--yellow);';
+  if (j==='red')    return base+'background:rgba(248,113,113,.15);border:1px solid rgba(248,113,113,.3);color:var(--red);';
+  return base+'background:var(--surface2);border:1px solid var(--border);color:var(--muted);';
+}
+function _jLabel(j) {
+  return j==='green'?'🟢 買い':j==='yellow'?'🟡 様子見':j==='red'?'🔴 見送り':'— 未判定';
+}
+
+function renderCandidates() {
+  if (_candChartObserver) { _candChartObserver.disconnect(); _candChartObserver = null; }
+  const active   = candidates.filter(c => c.status !== 'rejected');
+  const rejected = candidates.filter(c => c.status === 'rejected');
+  const listEl   = document.getElementById('candidateslist');
+  const rejListEl= document.getElementById('rejectedlist');
+  const rejBtn   = document.getElementById('rejected-toggle-btn');
+  if (!listEl) return;
+  if (!active.length) {
+    listEl.innerHTML = '<div class="empty"><div class="icon">📋</div>候補はまだありません<br><small style="margin-top:8px;display:block">右下の＋から候補を追加してください</small></div>';
+  } else {
+    listEl.innerHTML = active.map(candCardHTML).join('');
+    active.forEach(c => _observeCandChart(c));
+  }
+  if (rejBtn) rejBtn.textContent = `見送り履歴 (${rejected.length}件) ${_rejectedOpen?'▲':'▼'}`;
+  if (rejListEl) {
+    rejListEl.innerHTML = rejected.map(rejectedCardHTML).join('');
+    rejListEl.style.display = _rejectedOpen ? '' : 'none';
+  }
+}
+
+function candCardHTML(c) {
+  const j = c.judgment || 'none';
+  const condHTML = COND_SHORT.map((label, i) => {
+    const ok   = (c.condChecks||[])[i];
+    const note = ((c.condNotes||[])[i]||'').replace(/"/g,'&quot;');
+    return `<label class="cond-item${ok?' checked':''}">
+      <input type="checkbox"${ok?' checked':''} onchange="updateCandCond('${c.id}',${i},this.checked)" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer;flex-shrink:0;margin-top:2px">
+      <div class="cond-body">
+        <div class="cond-name" style="font-size:12px">${label}</div>
+        <div class="cond-desc">${COND_DESC[i]}</div>
+        <span class="cond-note"><input value="${note}" placeholder="メモ（任意）" onblur="updateCandNote('${c.id}',${i},this.value)"></span>
+      </div>
+    </label>`;
+  }).join('');
+  const bonusHTML = BONUS_LABELS.map((label, i) => {
+    const ok = (c.bonusChecks||[])[i];
+    return `<label class="bonus-item${ok?' checked':''}">
+      <input type="checkbox"${ok?' checked':''} onchange="toggleCandBonus('${c.id}',${i},this.checked)" style="width:15px;height:15px;accent-color:var(--purple);cursor:pointer;flex-shrink:0">
+      <span class="bonus-label">${label}</span>
+    </label>`;
+  }).join('');
+  return `<div class="stock-card" id="cand-card-${c.id}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px">
+      <div>
+        <div class="sc-name">${c.name}</div>
+        <div class="sc-code">${c.code||'—'} · ${c.currency||'JPY'}</div>
+      </div>
+      <span id="cand-judge-${c.id}" style="${_jBadgeStyle(j)}">${_jLabel(j)}</span>
+    </div>
+    <div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">押し目買い5条件</div>
+    <div class="cond-list" style="gap:5px;margin-bottom:10px">${condHTML}</div>
+    <details style="margin-bottom:10px">
+      <summary style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:5px">▶ 加点条件</summary>
+      <div class="bonus-list" style="margin-top:8px;margin-bottom:0">${bonusHTML}</div>
+    </details>
+    <div style="margin-bottom:10px">
+      <div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">メモ</div>
+      <textarea style="font-size:13px;resize:none;min-height:52px" placeholder="メモ" onblur="updateCandMemo('${c.id}',this.value)">${(c.memo||'').replace(/</g,'&lt;')}</textarea>
+    </div>
+    <div id="cand-tv-${c.id}" style="min-height:240px;border-radius:8px;overflow:hidden;background:#131722;margin-bottom:10px" data-code="${(c.code||'').replace(/"/g,'&quot;')}" data-currency="${c.currency||'JPY'}">
+      <div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">📡 スクロールするとチャートをロード</div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button onclick="openBuyFromCandModal('${c.id}')" style="flex:1;padding:8px;border-radius:8px;background:rgba(74,222,154,.15);color:var(--green);border:1px solid rgba(74,222,154,.3);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">✅ 購入した</button>
+      <button onclick="openRejectCandModal('${c.id}')" style="flex:1;padding:8px;border-radius:8px;background:rgba(248,113,113,.1);color:var(--red);border:1px solid rgba(248,113,113,.3);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">❌ 見送り</button>
+      <button onclick="deleteCandRef('${c.id}')" style="padding:8px 10px;border-radius:8px;background:transparent;color:var(--muted);border:1px solid var(--border);font-size:12px;cursor:pointer;font-family:inherit">🗑</button>
+    </div>
+  </div>`;
+}
+
+function rejectedCardHTML(c) {
+  const dateStr = c.rejectedAt ? new Date(c.rejectedAt).toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'}) : '—';
+  return `<div class="stock-card" style="opacity:.7">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <div style="flex:1;min-width:0">
+        <div class="sc-name" style="font-size:14px">${c.name}</div>
+        <div class="sc-code">${c.code||'—'} · 見送り ${dateStr}</div>
+        ${c.rejectedReason?`<div style="font-size:11px;color:var(--muted);margin-top:4px">理由: ${c.rejectedReason}</div>`:''}
+      </div>
+      <button onclick="deleteCandRef('${c.id}')" style="padding:5px 8px;border-radius:6px;background:transparent;color:var(--muted);border:1px solid var(--border);font-size:11px;cursor:pointer;font-family:inherit;flex-shrink:0">🗑</button>
+    </div>
+  </div>`;
+}
+
+function _observeCandChart(c) {
+  const el = document.getElementById('cand-tv-' + c.id);
+  if (!el || el.dataset.loaded) return;
+  if (!_candChartObserver) {
+    _candChartObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting || entry.target.dataset.loaded) return;
+        entry.target.dataset.loaded = '1';
+        _candChartObserver.unobserve(entry.target);
+        const tid = entry.target.id.replace('cand-tv-', '');
+        _initCandChart(tid, entry.target.dataset.code, entry.target.dataset.currency);
+      });
+    }, { threshold: 0.1 });
+  }
+  _candChartObserver.observe(el);
+}
+
+async function _initCandChart(id, code, currency) {
+  const wrap = document.getElementById('cand-tv-' + id);
+  if (!wrap) return;
+  if (!code) { wrap.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">銘柄コードを登録するとチャートが表示されます</div>'; return; }
+  wrap.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">📡 チャートデータを取得中...</div>';
+  let candles=null;
+  try { await loadLightweightCharts(); candles=await fetchCandles(code, currency, '1d', '1y'); } catch(e){}
+  if (!candles) { wrap.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">データ取得に失敗しました</div>'; return; }
+  wrap.innerHTML='';
+  const chartEl=document.createElement('div'); chartEl.style.cssText='width:100%;height:240px;'; wrap.appendChild(chartEl);
+  const chart=LightweightCharts.createChart(chartEl,{width:chartEl.clientWidth,height:240,layout:{background:{color:'#131722'},textColor:'#d1d4dc'},grid:{vertLines:{color:'#1e222d'},horzLines:{color:'#1e222d'}},timeScale:{timeVisible:false,borderColor:'#2a2e39'},rightPriceScale:{borderColor:'#2a2e39'},crosshair:{mode:1}});
+  const series=chart.addCandlestickSeries({upColor:'#4ade9a',downColor:'#f87171',wickUpColor:'#4ade9a',wickDownColor:'#f87171',borderVisible:false});
+  series.setData(candles);
+  const ma25s=chart.addLineSeries({color:'#60a5fa',lineWidth:1,priceLineVisible:false,lastValueVisible:true,title:'MA25'});
+  const ma75s=chart.addLineSeries({color:'#fb923c',lineWidth:1,priceLineVisible:false,lastValueVisible:true,title:'MA75'});
+  ma25s.setData(calcMA(candles,25)); ma75s.setData(calcMA(candles,75));
+  chart.timeScale().fitContent();
+  new ResizeObserver(()=>{ chart.applyOptions({width:chartEl.clientWidth}); }).observe(chartEl);
+}
+
+// インライン編集
+window.updateCandCond = async (id, i, checked) => {
+  const c=candidates.find(c=>c.id===id); if(!c) return;
+  if(!c.condChecks) c.condChecks=Array(5).fill(false);
+  c.condChecks[i]=checked;
+  const cnt=c.condChecks.filter(Boolean).length;
+  c.judgment=cnt===5?'green':cnt>=3?'yellow':cnt>0?'red':'none';
+  const badge=document.getElementById('cand-judge-'+id);
+  if(badge){badge.style.cssText=_jBadgeStyle(c.judgment);badge.textContent=_jLabel(c.judgment);}
+  _candLocalUpdate=true;
+  try{await updateDoc(doc(db,'candidates',String(id)),{condChecks:c.condChecks,judgment:c.judgment});}
+  finally{setTimeout(()=>{_candLocalUpdate=false;},1500);}
+};
+window.updateCandNote = async (id, i, val) => {
+  const c=candidates.find(c=>c.id===id); if(!c) return;
+  if(!c.condNotes) c.condNotes=Array(5).fill('');
+  c.condNotes[i]=val;
+  _candLocalUpdate=true;
+  try{await updateDoc(doc(db,'candidates',String(id)),{condNotes:c.condNotes});}
+  finally{setTimeout(()=>{_candLocalUpdate=false;},1500);}
+};
+window.toggleCandBonus = async (id, i, checked) => {
+  const c=candidates.find(c=>c.id===id); if(!c) return;
+  if(!c.bonusChecks) c.bonusChecks=Array(4).fill(false);
+  c.bonusChecks[i]=checked;
+  _candLocalUpdate=true;
+  try{await updateDoc(doc(db,'candidates',String(id)),{bonusChecks:c.bonusChecks});}
+  finally{setTimeout(()=>{_candLocalUpdate=false;},1500);}
+};
+window.updateCandMemo = async (id, val) => {
+  const c=candidates.find(c=>c.id===id); if(!c) return;
+  c.memo=val;
+  _candLocalUpdate=true;
+  try{await updateDoc(doc(db,'candidates',String(id)),{memo:val});}
+  finally{setTimeout(()=>{_candLocalUpdate=false;},1500);}
+};
+
+// 候補追加
+window.openAddCandModal = () => {
+  ['cand-name','cand-code','cand-memo'].forEach(k=>{const el=document.getElementById(k);if(el)el.value='';});
+  document.getElementById('cand-currency').value='JPY';
+  document.getElementById('addCandModal').classList.add('open');
+  setTimeout(()=>document.getElementById('cand-name').focus(),80);
+};
+window.closeAddCandModal = () => document.getElementById('addCandModal').classList.remove('open');
+document.getElementById('addCandModal').addEventListener('click',e=>{if(e.target===document.getElementById('addCandModal'))window.closeAddCandModal();});
+window.addCandidate = async () => {
+  const name=document.getElementById('cand-name').value.trim();
+  if(!name){showToast('銘柄名を入力してください',true);return;}
+  const id=String(Date.now())+Math.random().toString(36).slice(2);
+  await setDoc(doc(db,'candidates',id),{
+    id,name,code:document.getElementById('cand-code').value.trim(),
+    currency:document.getElementById('cand-currency').value,
+    memo:document.getElementById('cand-memo').value.trim(),
+    condChecks:Array(5).fill(false),condNotes:Array(5).fill(''),
+    bonusChecks:Array(4).fill(false),judgment:'none',
+    addedAt:Date.now(),status:'active'
+  });
+  window.closeAddCandModal();
+  showToast(`📋 ${name} を候補に追加しました`);
+};
+
+// 購入した
+window.openBuyFromCandModal = (id) => {
+  _buyingCandId=id;
+  const c=candidates.find(c=>c.id===id); if(!c) return;
+  document.getElementById('buy-cand-info').innerHTML=`<b>${c.name}</b>${c.code?' ('+c.code+')':''}`;
+  ['bc-buy','bc-qty','bc-target','bc-loss'].forEach(k=>{const el=document.getElementById(k);if(el)el.value='';});
+  document.getElementById('bc-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('buyFromCandModal').classList.add('open');
+};
+window.closeBuyFromCandModal = () => {document.getElementById('buyFromCandModal').classList.remove('open');_buyingCandId=null;};
+document.getElementById('buyFromCandModal').addEventListener('click',e=>{if(e.target===document.getElementById('buyFromCandModal'))window.closeBuyFromCandModal();});
+window.bcAutoFill = () => {
+  const p=parseFloat(document.getElementById('bc-buy').value); if(!p||p<=0) return;
+  document.getElementById('bc-target').value=Math.round(p*1.10);
+  document.getElementById('bc-loss').value=Math.round(p*0.95);
+};
+window.confirmBuyFromCand = async () => {
+  const c=candidates.find(c=>c.id===_buyingCandId); if(!c) return;
+  const buyPrice=parseFloat(document.getElementById('bc-buy').value);
+  if(isNaN(buyPrice)||buyPrice<=0){showToast('購入価格を入力してください',true);return;}
+  const id=String(Date.now())+Math.random().toString(36).slice(2);
+  await setDoc(doc(db,'watchlist',id),{
+    id,createdAt:Date.now(),name:c.name,code:c.code||'',currency:c.currency||'JPY',
+    buy:buyPrice,
+    qty:parseFloat(document.getElementById('bc-qty').value)||null,
+    target:parseFloat(document.getElementById('bc-target').value)||null,
+    loss:parseFloat(document.getElementById('bc-loss').value)||null,
+    buyDate:window._isValidDate(document.getElementById('bc-date').value)?document.getElementById('bc-date').value:'',
+    condChecks:c.condChecks||[],condNotes:c.condNotes||[],bonusChecks:c.bonusChecks||[],
+    checkedCount:(c.condChecks||[]).filter(Boolean).length,
+    judgment:c.judgment||'none',memo:c.memo||'',
+    horizon:'short',fromDashboard:false,
+    updatedAt:new Date().toLocaleString('ja-JP')
+  });
+  await deleteDoc(doc(db,'candidates',String(c.id)));
+  window.closeBuyFromCandModal();
+  showToast(`✅ ${c.name} をウォッチリストに追加しました`);
+  window.switchTab('watch');
+};
+
+// 見送り
+window.openRejectCandModal = (id) => {
+  _rejectingCandId=id;
+  const c=candidates.find(c=>c.id===id); if(!c) return;
+  document.getElementById('reject-cand-info').textContent=c.name+(c.code?' ('+c.code+')':'');
+  document.getElementById('reject-reason').value='';
+  document.getElementById('rejectCandModal').classList.add('open');
+};
+window.closeRejectCandModal = () => {document.getElementById('rejectCandModal').classList.remove('open');_rejectingCandId=null;};
+document.getElementById('rejectCandModal').addEventListener('click',e=>{if(e.target===document.getElementById('rejectCandModal'))window.closeRejectCandModal();});
+window.confirmRejectCand = async () => {
+  const c=candidates.find(c=>c.id===_rejectingCandId); if(!c) return;
+  await updateDoc(doc(db,'candidates',String(c.id)),{
+    status:'rejected',rejectedAt:Date.now(),
+    rejectedReason:document.getElementById('reject-reason').value.trim()
+  });
+  window.closeRejectCandModal();
+  showToast(`❌ ${c.name} を見送りにしました`);
+};
+
+window.deleteCandRef = async (id) => {
+  if(!confirm('候補を削除しますか？')) return;
+  await deleteDoc(doc(db,'candidates',String(id)));
+  showToast('🗑 削除しました');
+};
+window.toggleRejectedSection = () => {
+  _rejectedOpen=!_rejectedOpen;
+  const el=document.getElementById('rejectedlist');
+  const btn=document.getElementById('rejected-toggle-btn');
+  if(el) el.style.display=_rejectedOpen?'':'none';
+  const cnt=candidates.filter(c=>c.status==='rejected').length;
+  if(btn) btn.textContent=`見送り履歴 (${cnt}件) ${_rejectedOpen?'▲':'▼'}`;
+};
+window.onFabClick = () => {
+  if(activeTab==='candidates') window.openAddCandModal();
+  else window.openAddModal();
 };
 
 function renderHistory() {
