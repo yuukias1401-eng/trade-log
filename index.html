@@ -877,6 +877,11 @@ window.showDetail = (id) => {
       }).join('')}
     </div>
 
+    <div style="margin-bottom:12px">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">購入日</div>
+      <input type="text" id="d-buyDate" inputmode="numeric" placeholder="例: 2026-06-04" value="${s.buyDate||''}" oninput="_formatDateLive(this)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:14px;font-weight:600;box-sizing:border-box;font-family:inherit;">
+    </div>
+
     <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">メモ</div>
     <textarea id="d-memo" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:13px;resize:vertical;min-height:56px;font-family:inherit;box-sizing:border-box" placeholder="メモを入力">${s.memo||''}</textarea>
 
@@ -932,7 +937,8 @@ window.saveStockDetail = async () => {
   s.buy    = parseFloat(document.getElementById('d-buy')?.value)    || s.buy;
   s.target = parseFloat(document.getElementById('d-target')?.value) || null;
   s.loss   = parseFloat(document.getElementById('d-loss')?.value)   || null;
-  s.memo   = document.getElementById('d-memo')?.value?.trim() || '';
+  s.memo    = document.getElementById('d-memo')?.value?.trim() || '';
+  s.buyDate = document.getElementById('d-buyDate')?.value?.trim() ?? s.buyDate ?? '';
   s.condChecks=condChecks; s.condNotes=condNotes; s.bonusChecks=bonusChecks;
   s.checkedCount=checkedCount;
   s.judgment = checkedCount===5?'green':checkedCount>=3?'yellow':checkedCount>0?'red':'none';
@@ -1784,6 +1790,22 @@ function getSellSign(s) {
   return               { type:'watch',  label:`👀 様子見（損切まで -${toLoss.toFixed(1)}%）`, color:'var(--muted)', bg:'var(--surface2)',       border:'var(--border)'        };
 }
 
+const _expandedBars = new Set();
+window.togglePriceBars = (id) => {
+  const barsEl = document.getElementById('sc-bars-' + id);
+  const btnEl  = document.getElementById('pricebar-btn-' + id);
+  if (!barsEl || !btnEl) return;
+  if (_expandedBars.has(id)) {
+    _expandedBars.delete(id);
+    barsEl.style.display = 'none';
+    btnEl.textContent = '▼ 詳細';
+  } else {
+    _expandedBars.add(id);
+    barsEl.style.display = '';
+    btnEl.textContent = '▲ 閉じる';
+  }
+};
+
 function render() {
   const el=document.getElementById('watchlist');
   if(!stocks.length){ el.innerHTML=`<div class="empty"><div class="icon">📋</div>右下の＋から銘柄を追加してください</div>`; return; }
@@ -1949,8 +1971,12 @@ function render() {
             ${url?`<a href="${url}" target="_blank" rel="noopener" style="text-decoration:none;font-size:15px;flex-shrink:0;line-height:1" title="Yahoo Financeでチャート確認">📈</a>`:''}
             <div class="sc-name">${s.name}</div>
             ${stockCode?`<span style="font-size:11px;color:var(--muted);font-weight:500;flex-shrink:0">${stockCode}</span>`:''}
+            <button onclick="togglePriceBars('${s.id}')" id="pricebar-btn-${s.id}" style="margin-left:auto;flex-shrink:0;font-size:10px;color:var(--muted);background:transparent;border:none;cursor:pointer;padding:2px 4px;white-space:nowrap;font-family:inherit;line-height:1">▼ 詳細</button>
           </div>
-          ${s.buyDate?`<div style="font-size:10px;color:var(--muted);margin-top:1px">📅 ${s.buyDate}</div>`:''}
+          <div style="margin-top:2px;display:flex;align-items:center;gap:3px">
+            <span style="font-size:11px;line-height:1;flex-shrink:0">📅</span>
+            <input type="text" inputmode="numeric" value="${s.buyDate||''}" placeholder="購入日" oninput="_formatDateLive(this)" onblur="setBuyDate('${s.id}', this.value)" style="font-size:11px;color:var(--muted);background:transparent;border:none;outline:none;width:80px;font-family:inherit;padding:0;min-width:0;">
+          </div>
           ${pnlHTML}
         </div>
         <div class="sc-price-block">
@@ -1959,14 +1985,10 @@ function render() {
           <div class="sc-rate ${rc}">${sign}${rate}%</div>
         </div>
       </div>
-      <div class="sc-bars">
+      <div class="sc-bars" id="sc-bars-${s.id}" style="display:none">
         <div class="sc-bar"><div class="sc-bar-label">購入価格</div><div class="sc-bar-val col-buy">¥${buyPrice.toLocaleString()}</div></div>
         <div class="sc-bar"><div class="sc-bar-label">目標価格</div><div class="sc-bar-val col-target">${s.target?'¥'+s.target.toLocaleString():'—'}</div></div>
         <div class="sc-bar"><div class="sc-bar-label">損切ライン</div><div class="sc-bar-val col-loss">${s.loss?'¥'+s.loss.toLocaleString():'—'}</div></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <span style="font-size:11px;color:var(--muted);white-space:nowrap">📅 購入日</span>
-        <input type="text" inputmode="numeric" value="${s.buyDate||''}" placeholder="20260525" oninput="_formatDateLive(this)" onblur="setBuyDate('${s.id}', this.value)" style="flex:1;font-size:12px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-family:inherit">
       </div>
       ${gaugeHTML}
       ${stockCode?`<div style="margin-bottom:8px">
