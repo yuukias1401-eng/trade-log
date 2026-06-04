@@ -1608,10 +1608,10 @@ function render() {
       const pnlColor = pnlNative >= 0 ? 'var(--green)' : 'var(--red)';
       const pnlSign = pnlNative >= 0 ? '+' : '';
       if (pnlJPY !== null) {
-        pnlHTML = `<div style="font-size:11px;color:${pnlColor};font-weight:600;margin-top:1px">${pnlSign}¥${Math.round(pnlJPY).toLocaleString()} <span style="color:var(--muted);font-weight:400">(${qty}株)</span></div>`;
+        pnlHTML = `<div style="font-size:13px;color:${pnlColor};font-weight:700;margin-top:4px">${pnlSign}¥${Math.round(pnlJPY).toLocaleString()} <span style="font-size:11px;color:var(--muted);font-weight:400">${qty}株</span></div>`;
       } else if (currency !== 'JPY') {
         const sym = currency === 'USD' ? '$' : currency === 'HKD' ? 'HK$' : currency + ' ';
-        pnlHTML = `<div style="font-size:11px;color:${pnlColor};font-weight:600;margin-top:1px">${pnlSign}${sym}${Math.abs(pnlNative).toLocaleString(undefined,{maximumFractionDigits:2})} <span style="color:var(--muted);font-weight:400">(${qty}株)</span></div>`;
+        pnlHTML = `<div style="font-size:13px;color:${pnlColor};font-weight:700;margin-top:4px">${pnlSign}${sym}${Math.abs(pnlNative).toLocaleString(undefined,{maximumFractionDigits:2})} <span style="font-size:11px;color:var(--muted);font-weight:400">${qty}株</span></div>`;
       }
     }
     const jClass=s.judgment||'none';
@@ -1723,14 +1723,15 @@ function render() {
           <div style="display:flex;align-items:center;gap:5px;">
             ${url?`<a href="${url}" target="_blank" rel="noopener" style="text-decoration:none;font-size:15px;flex-shrink:0;line-height:1" title="Yahoo Financeでチャート確認">📈</a>`:''}
             <div class="sc-name">${s.name}</div>
+            ${stockCode?`<span style="font-size:11px;color:var(--muted);font-weight:500;flex-shrink:0">${stockCode}</span>`:''}
           </div>
-          <div class="sc-code">${stockCode||'—'}${s.buyDate?' · '+s.buyDate:''}</div>
+          ${s.buyDate?`<div style="font-size:10px;color:var(--muted);margin-top:1px">📅 ${s.buyDate}</div>`:''}
+          ${pnlHTML}
         </div>
         <div class="sc-price-block">
           <button style="font-size:10px;padding:2px 7px;border-radius:5px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);cursor:pointer;margin-bottom:4px;display:block;margin-left:auto" onclick="updateOnePrice('${s.id}')">📡 更新</button>
           <div class="sc-current ${rc}">¥${currentPrice.toLocaleString()}</div>
           <div class="sc-rate ${rc}">${sign}${rate}%</div>
-          ${pnlHTML}
         </div>
       </div>
       <div class="sc-bars">
