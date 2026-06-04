@@ -161,16 +161,10 @@ push しないとスマホに反映されない。
 - `window.openSettleModal` / `window.submitSettle`（sellReason は `submitSettle` で history に保存）
 - カードの render() 内ゲージ直前に alertHTML を生成している箇所にサインを追加
 
-### 2.【再挑戦したい】チャート表示の改善（特に日本株）
-現状: index.html の「📊 チャートを表示」ボタンで市場別に出し分け。
-- 米国株/香港株 → TradingView widgetembed の iframe 埋め込み（動作OK）
-- 日本株(東証) → TradingView 無料埋め込みは JPX データライセンスで不可
-  （「このシンボルはTradingView上でのみ利用可能です」と出て AAPL にフォールバックしてしまう）
-  → 現状は Yahoo!ファイナンス / 株探 / TradingView本体 への外部リンクボタンで代替中。
-調査済みでダメだった代替: Stooq（日本株チャート画像はデータなし・APIキー必須化）、株探(403)。
-今後試す候補: 自前でローソク足を描く（価格データの取得元が課題）、investing.com 等の別ウィジェット、
-有料 API。要相談。
-関連コード: `function chartMarket(code, currency)` / `window.toggleChart`
+### 2.【✅ 解決済み】チャート表示（日本株含む全市場対応）
+commit 1b76c03 で自前描画に刷新。Yahoo Finance chart API でOHLCデータを取得し
+Lightweight Charts(v4)でローソク足を描画。日本株・米国株・香港株すべてOK。
+外部リンク代替は不要になった。
 
 ---
 
