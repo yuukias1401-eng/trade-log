@@ -1693,6 +1693,14 @@ function _updateTFButtons(toolbar, activeInterval) {
 }
 
 // 足切り替え（ボタンから呼ばれる）
+function calcMA(candles, period) {
+  return candles.map((c, i) => {
+    if (i < period - 1) return null;
+    const sum = candles.slice(i - period + 1, i + 1).reduce((s, x) => s + x.close, 0);
+    return { time: c.time, value: sum / period };
+  }).filter(Boolean);
+}
+
 window.switchTF = async (id, interval) => {
   const state = _chartState.get(String(id));
   if (!state || state.loading) return;
@@ -1707,6 +1715,8 @@ window.switchTF = async (id, interval) => {
   if (state.cache.has(interval)) {
     const cached = state.cache.get(interval);
     state.series.setData(cached);
+    state.ma25series?.setData(calcMA(cached, 25));
+    state.ma75series?.setData(calcMA(cached, 75));
     state.chart.applyOptions({ timeScale: { timeVisible: tf.timeVisible } });
     state.chart.timeScale().fitContent();
     _applyBuyMarker(state.series, state.buyDate, cached, _isId(interval));
@@ -1725,12 +1735,14 @@ window.switchTF = async (id, interval) => {
 
   if (!candles) {
     showToast('データ取得に失敗しました', true);
-    _updateTFButtons(state.toolbar, state.currentInterval); // 前の足に戻す
+    _updateTFButtons(state.toolbar, state.currentInterval);
     return;
   }
 
   state.cache.set(interval, candles);
   state.series.setData(candles);
+  state.ma25series?.setData(calcMA(candles, 25));
+  state.ma75series?.setData(calcMA(candles, 75));
   state.chart.applyOptions({ timeScale: { timeVisible: tf.timeVisible } });
   state.chart.timeScale().fitContent();
   _applyBuyMarker(state.series, state.buyDate, candles, _isId(interval));
@@ -1804,6 +1816,12 @@ window.toggleChart = async (id) => {
   series.setData(initCandles);
   _applyBuyMarker(series, s.buyDate, initCandles, false); // 日足なのでイントラデイ=false
 
+  // 移動平均線 MA25 (青) / MA75 (オレンジ)
+  const ma25series = chart.addLineSeries({ color: '#60a5fa', lineWidth: 1, priceLineVisible: false, lastValueVisible: true, title: 'MA25' });
+  const ma75series = chart.addLineSeries({ color: '#fb923c', lineWidth: 1, priceLineVisible: false, lastValueVisible: true, title: 'MA75' });
+  ma25series.setData(calcMA(initCandles, 25));
+  ma75series.setData(calcMA(initCandles, 75));
+
   // title=''でチャート内テキストを非表示、右軸ラベルのみ表示（ローソク足を隠さないため）
   if (s.buy)    series.createPriceLine({ price: s.buy,    color: '#9ca3af', lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: '' });
   if (s.target) series.createPriceLine({ price: s.target, color: '#60a5fa', lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: '' });
@@ -1813,7 +1831,7 @@ window.toggleChart = async (id) => {
 
   // 状態をキャッシュ
   const cache = new Map([[DEFAULT_TF, initCandles]]);
-  _chartState.set(String(id), { chart, series, cache, toolbar, code, currency: s.currency, buyDate: s.buyDate, currentInterval: DEFAULT_TF, loading: false });
+  _chartState.set(String(id), { chart, series, ma25series, ma75series, cache, toolbar, code, currency: s.currency, buyDate: s.buyDate, currentInterval: DEFAULT_TF, loading: false });
   _updateTFButtons(toolbar, DEFAULT_TF);
 
   // レスポンシブ: カード幅が変わったらチャート幅を追従
