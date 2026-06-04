@@ -202,7 +202,17 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 <div class="container" id="tab-watch">
   <div class="list-header">
     <div class="list-title">ウォッチリスト</div>
-    <button class="btn btn-sm btn-ghost" onclick="updateAllPrices()">📡 株価一括更新</button>
+    <div style="display:flex;gap:6px;align-items:center">
+      <select id="sortSelect" onchange="render()" style="font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 6px;color:var(--muted);font-family:inherit;cursor:pointer">
+        <option value="created">追加順</option>
+        <option value="name">銘柄名順</option>
+        <option value="pnl_desc">損益額↑</option>
+        <option value="pnl_asc">損益額↓</option>
+        <option value="rate_desc">損益率↑</option>
+        <option value="rate_asc">損益率↓</option>
+      </select>
+      <button class="btn btn-sm btn-ghost" onclick="updateAllPrices()">📡 一括更新</button>
+    </div>
   </div>
   <div id="watchlist"></div>
   <div id="allocation-section" style="display:none"></div>
@@ -997,7 +1007,9 @@ window.toggleTVChart = (id) => {
   }
 };
 document.getElementById('detailModal').addEventListener('click', e=>{
-  if(e.target===document.getElementById('detailModal')) window.closeModal();
+  // 詳細・編集モーダルは枠外タップで閉じない（入力内容の誤消失防止）
+  // 閉じるには「閉じる」or「保存」ボタンを使う
+  if(false && e.target===document.getElementById('detailModal')) window.closeModal();
 });
 
 let adjustingId = null;
@@ -1412,13 +1424,15 @@ function renderHistory() {
     el.innerHTML = `<div class="empty"><div class="icon">📋</div>決済記録はまだありません<br><small style="margin-top:8px;display:block">銘柄カードの「決済」ボタンから記録できます</small></div>`;
     return;
   }
-  // 確定損益サマリー
-  const totalPL = history.reduce((s, h) => s + (h.plYen || 0), 0);
-  const wins    = history.filter(h => (h.plPct || 0) >= 0).length;
-  const losses  = history.length - wins;
+  // 確定損益サマリー（除外フラグのないものだけ集計）
+  const included = history.filter(h => !h.excluded);
+  const totalPL = included.reduce((s, h) => s + (h.plYen || 0), 0);
+  const wins    = included.filter(h => (h.plPct || 0) >= 0).length;
+  const losses  = included.length - wins;
+  const excCount = history.length - included.length;
   const sumColor = totalPL >= 0 ? 'var(--green)' : 'var(--red)';
   const summaryHTML = `<div style="background:var(--surface2);border-radius:12px;padding:14px 16px;margin-bottom:12px;border:1px solid var(--border)">
-    <div style="font-size:13px;color:var(--muted);margin-bottom:6px">確定損益合計</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:6px">確定損益合計${excCount>0?` <span style="font-size:10px">(${excCount}件除外中)</span>`:''}</div>
     <div style="font-size:22px;font-weight:700;color:${sumColor}">${totalPL >= 0 ? '+' : ''}¥${totalPL.toLocaleString()}</div>
     <div style="font-size:12px;color:var(--muted);margin-top:4px">勝ち ${wins}件 / 負け ${losses}件</div>
   </div>`;
@@ -1433,7 +1447,9 @@ function renderHistory() {
     const partialBadge = (h.soldQty != null && h.qty != null && h.soldQty !== h.qty)
       ? `<span style="font-size:10px;background:rgba(250,204,21,.15);color:var(--yellow);border:1px solid rgba(250,204,21,.3);border-radius:6px;padding:2px 7px;font-weight:600;margin-left:6px">部分決済 ${h.soldQty}株</span>`
       : '';
-    return `<div class="hist-card">
+    const isExcluded = !!h.excluded;
+    return `<div class="hist-card" style="${isExcluded?'opacity:.5':''}">
+      ${isExcluded?`<div style="font-size:10px;color:var(--muted);background:var(--surface2);border-radius:6px;padding:2px 8px;display:inline-block;margin-bottom:6px">📊 統計から除外中</div>`:''}
       <div class="sc-top">
         <div>
           <div class="sc-name">${h.name}${partialBadge}</div>
@@ -1451,10 +1467,11 @@ function renderHistory() {
       </div>
       ${h.sellReason ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">📝 売った理由: ${h.sellReason}</div>` : ''}
       ${h.sellMemo   ? `<div style="font-size:12px;color:var(--muted);margin-top:4px">💭 ${h.sellMemo}</div>` : ''}
-      ${h.manualEntry ? `<div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">
-        <button onclick="editManualHistory('${h.id}')" style="font-size:11px;padding:3px 10px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);cursor:pointer">✏️ 編集</button>
-        <button onclick="deleteManualHistory('${h.id}')" style="font-size:11px;padding:3px 10px;border-radius:6px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--red);cursor:pointer">🗑 削除</button>
-      </div>` : ''}
+      <div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">
+        <button onclick="toggleHistoryExclude('${h.id}')" style="font-size:11px;padding:3px 10px;border-radius:6px;background:${isExcluded?'rgba(74,222,154,.1)':'var(--surface2)'};border:1px solid ${isExcluded?'rgba(74,222,154,.3)':'var(--border)'};color:${isExcluded?'var(--green)':'var(--muted)'};cursor:pointer">${isExcluded?'✅ 統計に戻す':'📊 統計から除外'}</button>
+        ${h.manualEntry ? `<button onclick="editManualHistory('${h.id}')" style="font-size:11px;padding:3px 10px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);cursor:pointer">✏️ 編集</button>
+        <button onclick="deleteManualHistory('${h.id}')" style="font-size:11px;padding:3px 10px;border-radius:6px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--red);cursor:pointer">🗑 削除</button>` : ''}
+      </div>
     </div>`;
   }).join('');
 }
@@ -1466,14 +1483,15 @@ function renderStats() {
     el.innerHTML = `<div class="empty"><div class="icon">📊</div>決済記録がないため統計が表示できません</div>`;
     return;
   }
-  const wins   = history.filter(h => (h.plPct||0) >= 0);
-  const losses = history.filter(h => (h.plPct||0) <  0);
-  const winRate  = (wins.length / history.length * 100).toFixed(1);
+  const statsTarget = history.filter(h => !h.excluded); // 除外フラグのないものだけ統計対象
+  const wins   = statsTarget.filter(h => (h.plPct||0) >= 0);
+  const losses = statsTarget.filter(h => (h.plPct||0) <  0);
+  const winRate  = statsTarget.length ? (wins.length / statsTarget.length * 100).toFixed(1) : '0.0';
   const avgWin   = wins.length   ? (wins.reduce((s,h)=>s+(h.plPct||0),0)/wins.length).toFixed(2)   : '—';
   const avgLoss  = losses.length ? (losses.reduce((s,h)=>s+(h.plPct||0),0)/losses.length).toFixed(2) : '—';
-  const totalPL  = history.reduce((s,h) => s+(h.plYen||0), 0);
-  const best     = history.reduce((a,b) => (a.plYen||0)>(b.plYen||0)?a:b);
-  const worst    = history.reduce((a,b) => (a.plYen||0)<(b.plYen||0)?a:b);
+  const totalPL  = statsTarget.reduce((s,h) => s+(h.plYen||0), 0);
+  const best     = statsTarget.length ? statsTarget.reduce((a,b) => (a.plYen||0)>(b.plYen||0)?a:b) : null;
+  const worst    = statsTarget.length ? statsTarget.reduce((a,b) => (a.plYen||0)<(b.plYen||0)?a:b) : null;
   const plColor  = totalPL >= 0 ? 'var(--green)' : 'var(--red)';
   el.innerHTML = `
     <div class="stat-grid">
@@ -1809,7 +1827,23 @@ window.togglePriceBars = (id) => {
 function render() {
   const el=document.getElementById('watchlist');
   if(!stocks.length){ el.innerHTML=`<div class="empty"><div class="icon">📋</div>右下の＋から銘柄を追加してください</div>`; return; }
-  el.innerHTML=stocks.map(s=>{
+  // ソート
+  const sortKey = document.getElementById('sortSelect')?.value || 'created';
+  const sorted = [...stocks].sort((a, b) => {
+    const buyA = a.buy ?? a.cost ?? 0, curA = a.current ?? a.price ?? buyA;
+    const buyB = b.buy ?? b.cost ?? 0, curB = b.current ?? b.price ?? buyB;
+    const pnlA = buyA > 0 ? (curA - buyA) * (parseFloat(a.qty)||1) : 0;
+    const pnlB = buyB > 0 ? (curB - buyB) * (parseFloat(b.qty)||1) : 0;
+    const rateA = buyA > 0 ? (curA - buyA) / buyA : 0;
+    const rateB = buyB > 0 ? (curB - buyB) / buyB : 0;
+    if (sortKey === 'name')     return (a.name||'').localeCompare(b.name||'', 'ja');
+    if (sortKey === 'pnl_desc') return pnlB - pnlA;
+    if (sortKey === 'pnl_asc')  return pnlA - pnlB;
+    if (sortKey === 'rate_desc') return rateB - rateA;
+    if (sortKey === 'rate_asc')  return rateA - rateB;
+    return (a.createdAt||0) - (b.createdAt||0); // created（デフォルト）
+  });
+  el.innerHTML=sorted.map(s=>{
     // ダッシュボードから同期された銘柄はフィールド名が異なる場合がある
     const buyPrice = s.buy ?? s.cost ?? 0;
     const currentPrice = s.current ?? s.price ?? buyPrice;
@@ -2134,6 +2168,13 @@ window.deleteManualHistory = async (id) => {
   if (!confirm('この履歴を削除しますか？')) return;
   await deleteDoc(doc(db, 'history', id));
   showToast('🗑 履歴を削除しました');
+};
+window.toggleHistoryExclude = async (id) => {
+  const h = history.find(x => x.id === id);
+  if (!h) return;
+  h.excluded = !h.excluded;
+  await setDoc(doc(db, 'history', id), h);
+  showToast(h.excluded ? '📊 統計から除外しました' : '✅ 統計に含めました');
 };
 window.editManualHistory = (id) => {
   const h = history.find(x => x.id === id);
