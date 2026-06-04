@@ -211,6 +211,7 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 <div class="container" id="tab-history" style="display:none">
   <div class="list-header">
     <div class="list-title">決済履歴</div>
+    <button class="btn btn-sm btn-ghost" onclick="openManualHistoryModal()" style="font-size:11px;padding:4px 10px">📝 手動で追加</button>
   </div>
   <div id="historylist"></div>
 </div>
@@ -396,6 +397,46 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
     <div class="modal-footer">
       <button class="btn btn-sm btn-ghost" onclick="closeExecModal()">キャンセル</button>
       <button class="btn btn-primary" style="width:auto;padding:10px 24px;" onclick="submitExec()">✅ 約定を記録</button>
+    </div>
+  </div>
+</div>
+
+<!-- 手動履歴追加モーダル -->
+<div class="modal" id="manualHistoryModal">
+  <div class="modal-inner">
+    <div class="modal-title">📝 決済記録を手動追加</div>
+    <div class="row row2">
+      <div class="fg"><label>銘柄名 *</label><input id="mh-name" type="text" placeholder="例: ASTスペースモバイル"></div>
+      <div class="fg"><label>銘柄コード</label><input id="mh-code" type="text" placeholder="例: ASTS"></div>
+    </div>
+    <div class="row row2">
+      <div class="fg"><label>売却日</label><input id="mh-date" type="text" inputmode="numeric" placeholder="例: 20260604" oninput="_formatDateLive(this)"></div>
+      <div class="fg"><label>株数</label><input id="mh-qty" type="number" placeholder="例: 10"></div>
+    </div>
+    <div class="row row2">
+      <div class="fg"><label>買値 *</label><input id="mh-buy" type="number" step="any" placeholder="例: 90.11" oninput="calcManualHistoryPL()"></div>
+      <div class="fg"><label>売値 *</label><input id="mh-sell" type="number" step="any" placeholder="例: 113.41" oninput="calcManualHistoryPL()"></div>
+    </div>
+    <div id="mh-pl-preview" style="display:none;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:600;font-size:15px;"></div>
+    <div class="row row1">
+      <div class="fg">
+        <label>売った理由</label>
+        <div id="mh-reason-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+          <button type="button" class="reason-btn" data-value="💰 利確（目標到達）" onclick="selectManualReason(this)">💰 利確</button>
+          <button type="button" class="reason-btn" data-value="🔒 トレール（高値から下落）" onclick="selectManualReason(this)">🔒 トレール</button>
+          <button type="button" class="reason-btn" data-value="🚨 損切（ルール通り）" onclick="selectManualReason(this)">🚨 損切</button>
+          <button type="button" class="reason-btn" data-value="💥 前提崩壊（決算・材料）" onclick="selectManualReason(this)">💥 前提崩壊</button>
+          <button type="button" class="reason-btn" data-value="⏳ 時間切れ（塩漬け）" onclick="selectManualReason(this)">⏳ 時間切れ</button>
+          <button type="button" class="reason-btn" data-value="✏️ その他" onclick="selectManualReason(this)">✏️ その他</button>
+        </div>
+      </div>
+    </div>
+    <div class="row row1">
+      <div class="fg"><label>メモ（任意）</label><textarea id="mh-memo" placeholder="振り返りや状況メモなど"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sm btn-ghost" onclick="closeManualHistoryModal()">キャンセル</button>
+      <button class="btn btn-primary" style="width:auto;padding:10px 24px;" onclick="submitManualHistory()">履歴に記録する</button>
     </div>
   </div>
 </div>
@@ -1943,6 +1984,73 @@ function render() {
   document.getElementById('lastUpdate').textContent=new Date().toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
   renderAllocation();
 }
+
+// ── 手動履歴追加 ──
+window.openManualHistoryModal = () => {
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('mh-name').value = '';
+  document.getElementById('mh-code').value = '';
+  document.getElementById('mh-date').value = today;
+  document.getElementById('mh-qty').value = '';
+  document.getElementById('mh-buy').value = '';
+  document.getElementById('mh-sell').value = '';
+  document.getElementById('mh-memo').value = '';
+  document.getElementById('mh-pl-preview').style.display = 'none';
+  document.querySelectorAll('#mh-reason-btns .reason-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('manualHistoryModal').classList.add('open');
+  setTimeout(() => document.getElementById('mh-name').focus(), 80);
+};
+window.closeManualHistoryModal = () => {
+  document.getElementById('manualHistoryModal').classList.remove('open');
+};
+document.getElementById('manualHistoryModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('manualHistoryModal')) window.closeManualHistoryModal();
+});
+window.selectManualReason = (btn) => {
+  document.querySelectorAll('#mh-reason-btns .reason-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+};
+window.calcManualHistoryPL = () => {
+  const buy = parseFloat(document.getElementById('mh-buy').value);
+  const sell = parseFloat(document.getElementById('mh-sell').value);
+  const qty = parseFloat(document.getElementById('mh-qty').value) || null;
+  const prev = document.getElementById('mh-pl-preview');
+  if (!buy || !sell || buy <= 0 || sell <= 0) { prev.style.display='none'; return; }
+  const pct = ((sell - buy) / buy * 100).toFixed(2);
+  const isWin = sell >= buy;
+  const plYen = qty ? Math.round((sell - buy) * qty) : null;
+  const sign = isWin ? '+' : '';
+  prev.style.display = 'block';
+  prev.style.background = isWin ? 'rgba(74,222,154,.1)' : 'rgba(248,113,113,.1)';
+  prev.style.color = isWin ? 'var(--green)' : 'var(--red)';
+  prev.style.border = `1px solid ${isWin ? 'rgba(74,222,154,.3)' : 'rgba(248,113,113,.3)'}`;
+  prev.textContent = `${isWin?'📈 利益':'📉 損失'}: ${sign}${pct}%${plYen!=null?' ('+sign+'¥'+plYen.toLocaleString()+')':''}`;
+};
+window.submitManualHistory = async () => {
+  const name = document.getElementById('mh-name').value.trim();
+  const code = document.getElementById('mh-code').value.trim();
+  const sellDate = document.getElementById('mh-date').value;
+  const qty = parseFloat(document.getElementById('mh-qty').value) || null;
+  const buy = parseFloat(document.getElementById('mh-buy').value);
+  const sell = parseFloat(document.getElementById('mh-sell').value);
+  const memo = document.getElementById('mh-memo').value.trim();
+  const reason = document.querySelector('#mh-reason-btns .reason-btn.selected')?.dataset?.value || '';
+  if (!name) { showToast('銘柄名を入力してください', true); return; }
+  if (!buy || buy <= 0) { showToast('買値を入力してください', true); return; }
+  if (!sell || sell <= 0) { showToast('売値を入力してください', true); return; }
+  const plPct = ((sell - buy) / buy * 100).toFixed(2);
+  const plYen = qty ? Math.round((sell - buy) * qty) : null;
+  const id = 'manual_' + Date.now();
+  const historyItem = {
+    id, name, code, qty, buy, sellPrice: sell, sellDate,
+    sellReason: reason, sellMemo: memo,
+    plPct: parseFloat(plPct), plYen,
+    settledAt: Date.now(), manualEntry: true
+  };
+  await setDoc(doc(db, 'history', id), historyItem);
+  window.closeManualHistoryModal();
+  showToast(`✅ 履歴に追加: ${name} ${parseFloat(plPct)>=0?'+':''}${plPct}%`);
+};
 
 let toastTimer;
 function showToast(msg,isErr=false){
