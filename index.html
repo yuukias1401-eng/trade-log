@@ -1608,10 +1608,10 @@ function render() {
       const pnlColor = pnlNative >= 0 ? 'var(--green)' : 'var(--red)';
       const pnlSign = pnlNative >= 0 ? '+' : '';
       if (pnlJPY !== null) {
-        pnlHTML = `<div style="font-size:11px;color:${pnlColor};font-weight:600;margin-top:1px">${pnlSign}¥${Math.round(pnlJPY).toLocaleString()}</div>`;
+        pnlHTML = `<div style="font-size:11px;color:${pnlColor};font-weight:600;margin-top:1px">${pnlSign}¥${Math.round(pnlJPY).toLocaleString()} <span style="color:var(--muted);font-weight:400">(${qty}株)</span></div>`;
       } else if (currency !== 'JPY') {
         const sym = currency === 'USD' ? '$' : currency === 'HKD' ? 'HK$' : currency + ' ';
-        pnlHTML = `<div style="font-size:11px;color:${pnlColor};font-weight:600;margin-top:1px">${pnlSign}${sym}${Math.abs(pnlNative).toLocaleString(undefined,{maximumFractionDigits:2})}</div>`;
+        pnlHTML = `<div style="font-size:11px;color:${pnlColor};font-weight:600;margin-top:1px">${pnlSign}${sym}${Math.abs(pnlNative).toLocaleString(undefined,{maximumFractionDigits:2})} <span style="color:var(--muted);font-weight:400">(${qty}株)</span></div>`;
       }
     }
     const jClass=s.judgment||'none';
