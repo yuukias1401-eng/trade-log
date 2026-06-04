@@ -909,16 +909,6 @@ window.showDetail = (id) => {
           <div style="font-size:12px">目標 <b style="color:var(--blue)">¥${(adj.newTarget||0).toLocaleString()}</b> / 損切 <b style="color:var(--red)">¥${(adj.newLoss||0).toLocaleString()}</b></div>
         </div>`).join('')}
     </div>`:''}
-    ${(s.code||s.ticker)?`
-    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px">
-      <button onclick="toggleTVChart('${s.id}')" id="tv-btn-${s.id}"
-        style="width:100%;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;text-align:left">
-        📊 TradingViewチャートを表示
-      </button>
-      <div id="tv-wrap-${s.id}" style="display:none;margin-top:8px;border-radius:8px;overflow:hidden">
-        <iframe id="tv-frame-${s.id}" src="" width="100%" height="340" frameborder="0" scrolling="no" style="display:block;border:0"></iframe>
-      </div>
-    </div>`:''}
   `;
   updateDetailJudge();
   document.getElementById('detailModal').classList.add('open');
@@ -1761,9 +1751,10 @@ window.toggleChart = async (id) => {
   series.setData(initCandles);
   _applyBuyMarker(series, s.buyDate, initCandles, false); // 日足なのでイントラデイ=false
 
-  if (s.buy)    series.createPriceLine({ price: s.buy,    color: '#9ca3af', lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: '買値' });
-  if (s.target) series.createPriceLine({ price: s.target, color: '#60a5fa', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '目標' });
-  if (s.loss)   series.createPriceLine({ price: s.loss,   color: '#f87171', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '損切' });
+  // title=''でチャート内テキストを非表示、右軸ラベルのみ表示（ローソク足を隠さないため）
+  if (s.buy)    series.createPriceLine({ price: s.buy,    color: '#9ca3af', lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: '' });
+  if (s.target) series.createPriceLine({ price: s.target, color: '#60a5fa', lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: '' });
+  if (s.loss)   series.createPriceLine({ price: s.loss,   color: '#f87171', lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: '' });
 
   chart.timeScale().fitContent();
 
