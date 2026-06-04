@@ -334,6 +334,13 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
       <div class="fg"><label>決済日</label><input id="s-date" type="text" inputmode="numeric" placeholder="例: 20260525" oninput="_formatDateLive(this)"></div>
       <div class="fg"><label>決済価格 (円) *</label><input id="s-price" type="number" placeholder="例: 3800" oninput="calcSettlePL()"></div>
     </div>
+    <div id="s-qty-row" class="row row1">
+      <div class="fg">
+        <label>売却数量（株）</label>
+        <input id="s-qty" type="number" min="1" placeholder="株数を入力" oninput="calcSettlePL()">
+        <div id="s-qty-remain" style="font-size:11px;color:var(--muted);margin-top:4px">残り: — 株</div>
+      </div>
+    </div>
     <div id="s-pl-preview" style="display:none;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:600;font-size:15px;"></div>
     <div class="row row1">
       <div class="fg">
@@ -1047,6 +1054,17 @@ window.openSettleModal = (id) => {
   document.getElementById('s-date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('s-price').value = '';
   document.getElementById('s-memo').value = '';
+  // 売却数量欄: qtyがある銘柄のみ表示し初期値を全株にセット
+  const qtyRow = document.getElementById('s-qty-row');
+  const qtyEl  = document.getElementById('s-qty');
+  const remainEl = document.getElementById('s-qty-remain');
+  if (s.qty) {
+    if (qtyRow) qtyRow.style.display = '';
+    if (qtyEl) qtyEl.value = s.qty;
+    if (remainEl) { remainEl.textContent = '残り: — 株'; remainEl.style.color = 'var(--muted)'; }
+  } else {
+    if (qtyRow) qtyRow.style.display = 'none';
+  }
   // 理由ボタンをリセットし、売りサインに応じて初期選択
   document.querySelectorAll('#s-reason-btns .reason-btn').forEach(b => b.classList.remove('selected'));
   const _initSign = getSellSign(s);
@@ -1062,7 +1080,7 @@ window.openSettleModal = (id) => {
   const curP  = s.current ?? s.price ?? buyP;
   const diff = curP - buyP;
   const rate = buyP > 0 ? (diff / buyP * 100).toFixed(2) : '0.00';
-  const rc = diff >= 0 ? 'var(--red)' : 'var(--green)';
+  const rc = diff >= 0 ? 'var(--green)' : 'var(--red)';
   document.getElementById('settle-stock-info').innerHTML = `
     <div style="font-size:15px;font-weight:700;margin-bottom:6px">${s.name}${s.code||s.ticker ? ' (' + (s.code||s.ticker) + ')' : ''}</div>
     <div style="display:flex;gap:16px;flex-wrap:wrap">
@@ -1091,7 +1109,20 @@ window.calcSettlePL = () => {
   if (!s || isNaN(sellPrice) || sellPrice <= 0) { preview.style.display = 'none'; return; }
   const _buyP = s.buy ?? s.cost ?? 0;
   const plPct = _buyP > 0 ? ((sellPrice - _buyP) / _buyP * 100).toFixed(2) : '0.00';
-  const plYen = s.qty ? Math.round((sellPrice - _buyP) * s.qty) : null;
+  const soldQty = parseFloat(document.getElementById('s-qty')?.value) || s.qty || null;
+  const plYen = soldQty ? Math.round((sellPrice - _buyP) * soldQty) : null;
+  // 残り株数を表示
+  const remainEl = document.getElementById('s-qty-remain');
+  if (remainEl && s.qty && soldQty) {
+    const remain = s.qty - soldQty;
+    if (remain < 0) {
+      remainEl.textContent = '⚠️ 保有数を超えています';
+      remainEl.style.color = 'var(--red)';
+    } else {
+      remainEl.textContent = remain === 0 ? '残り: 0株（全決済）' : `残り: ${remain}株`;
+      remainEl.style.color = remain === 0 ? 'var(--muted)' : 'var(--blue)';
+    }
+  }
   const isWin = sellPrice >= _buyP;
   preview.style.cssText = `display:block;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:600;font-size:15px;background:${isWin ? 'rgba(74,222,154,.1)' : 'rgba(248,113,113,.1)'};border:1px solid ${isWin ? 'rgba(74,222,154,.3)' : 'rgba(248,113,113,.3)'};color:${isWin ? 'var(--green)' : 'var(--red)'};`;
   preview.textContent = `${isWin ? '📈 利益' : '📉 損失'}: ${isWin ? '+' : ''}${plPct}%${plYen !== null ? ' (' + (isWin ? '+' : '') + '¥' + plYen.toLocaleString() + ')' : ''}`;
@@ -1102,9 +1133,14 @@ window.submitSettle = async () => {
   if (!s) return;
   const sellPrice = parseFloat(document.getElementById('s-price').value);
   if (isNaN(sellPrice) || sellPrice <= 0) { showToast('決済価格を入力してください', true); return; }
+  const soldQty = parseFloat(document.getElementById('s-qty')?.value) || s.qty || null;
+  const remainQty = (s.qty && soldQty) ? s.qty - soldQty : null;
+  if (soldQty && remainQty !== null && remainQty < 0) {
+    showToast('⚠️ 売却数量が保有数量を超えています', true); return;
+  }
   const buyPriceForSettle = s.buy ?? s.cost ?? 0;
   const plPct = buyPriceForSettle > 0 ? ((sellPrice - buyPriceForSettle) / buyPriceForSettle * 100).toFixed(2) : '0.00';
-  const plYen = s.qty ? Math.round((sellPrice - buyPriceForSettle) * s.qty) : null;
+  const plYen = soldQty ? Math.round((sellPrice - buyPriceForSettle) * soldQty) : null;
   const historyItem = {
     ...s,
     sellDate: window._isValidDate(document.getElementById('s-date').value) ? document.getElementById('s-date').value : '',
@@ -1113,12 +1149,24 @@ window.submitSettle = async () => {
     sellMemo: document.getElementById('s-memo').value.trim(),
     plPct: parseFloat(plPct),
     plYen,
+    soldQty,
     settledAt: Date.now()
   };
-  await setDoc(doc(db, 'history', String(s.id)), historyItem);
-  await removeStock(s.id);
-  window.closeSettleModal();
-  showToast(`✅ 決済完了！ ${parseFloat(plPct) >= 0 ? '+' : ''}${plPct}%`);
+  if (remainQty === null || remainQty <= 0) {
+    // 全決済（カードを削除）
+    await setDoc(doc(db, 'history', String(s.id)), historyItem);
+    await removeStock(s.id);
+    window.closeSettleModal();
+    showToast(`✅ 決済完了！ ${parseFloat(plPct) >= 0 ? '+' : ''}${plPct}%`);
+  } else {
+    // 部分決済（カードを残し株数を更新）
+    await setDoc(doc(db, 'history', String(s.id) + '_' + Date.now()), historyItem);
+    s.qty = remainQty;
+    s.partialSettled = (s.partialSettled || 0) + 1;
+    await saveStock(s);
+    window.closeSettleModal();
+    showToast(`✅ 部分決済！ ${soldQty}株売却 → 残り${remainQty}株`);
+  }
 };
 
 window.importFromFile = async function(input) {
