@@ -204,12 +204,13 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
     <div class="list-title">ウォッチリスト</div>
     <div style="display:flex;gap:6px;align-items:center">
       <select id="sortSelect" onchange="render()" style="font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 6px;color:var(--muted);font-family:inherit;cursor:pointer">
+        <option value="signal">🚨 売りサイン優先</option>
         <option value="created">追加順</option>
         <option value="name">銘柄名順</option>
-        <option value="pnl_desc">損益額↑</option>
-        <option value="pnl_asc">損益額↓</option>
-        <option value="rate_desc">損益率↑</option>
-        <option value="rate_asc">損益率↓</option>
+        <option value="pnl_desc">損益額 大↑</option>
+        <option value="pnl_asc">損益額 小↓</option>
+        <option value="rate_desc">損益率 高↑</option>
+        <option value="rate_asc">損益率 低↓</option>
       </select>
       <button class="btn btn-sm btn-ghost" onclick="updateAllPrices()">📡 一括更新</button>
     </div>
@@ -1426,14 +1427,21 @@ function renderHistory() {
   }
   // 確定損益サマリー（除外フラグのないものだけ集計）
   const included = history.filter(h => !h.excluded);
-  const totalPL = included.reduce((s, h) => s + (h.plYen || 0), 0);
+  const totalPL    = included.reduce((s, h) => s + (h.plYen || 0), 0);
+  const totalPLAll = history.reduce((s, h) => s + (h.plYen || 0), 0); // 除外含む全件
   const wins    = included.filter(h => (h.plPct || 0) >= 0).length;
   const losses  = included.length - wins;
   const excCount = history.length - included.length;
   const sumColor = totalPL >= 0 ? 'var(--green)' : 'var(--red)';
+  const allStr = excCount > 0
+    ? `<span style="font-size:11px;color:var(--muted);margin-left:6px">(全て含む: ${totalPLAll >= 0 ? '+' : ''}¥${totalPLAll.toLocaleString()})</span>`
+    : '';
   const summaryHTML = `<div style="background:var(--surface2);border-radius:12px;padding:14px 16px;margin-bottom:12px;border:1px solid var(--border)">
-    <div style="font-size:13px;color:var(--muted);margin-bottom:6px">確定損益合計${excCount>0?` <span style="font-size:10px">(${excCount}件除外中)</span>`:''}</div>
-    <div style="font-size:22px;font-weight:700;color:${sumColor}">${totalPL >= 0 ? '+' : ''}¥${totalPL.toLocaleString()}</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:6px">確定損益合計${excCount>0?` <span style="font-size:10px;color:var(--muted)">(${excCount}件除外中)</span>`:''}</div>
+    <div style="display:flex;align-items:baseline;flex-wrap:wrap;gap:4px">
+      <span style="font-size:22px;font-weight:700;color:${sumColor}">${totalPL >= 0 ? '+' : ''}¥${totalPL.toLocaleString()}</span>
+      ${allStr}
+    </div>
     <div style="font-size:12px;color:var(--muted);margin-top:4px">勝ち ${wins}件 / 負け ${losses}件</div>
   </div>`;
 
@@ -1828,7 +1836,13 @@ function render() {
   const el=document.getElementById('watchlist');
   if(!stocks.length){ el.innerHTML=`<div class="empty"><div class="icon">📋</div>右下の＋から銘柄を追加してください</div>`; return; }
   // ソート
-  const sortKey = document.getElementById('sortSelect')?.value || 'created';
+  const sortKey = document.getElementById('sortSelect')?.value || 'signal';
+  // 売りサイン優先度（signal_priority）
+  const signalPriority = s => {
+    const sg = getSellSign(s);
+    if (!sg) return 5;
+    return {loss:0, target:1, near:2, hold:3, watch:4}[sg.type] ?? 5;
+  };
   const sorted = [...stocks].sort((a, b) => {
     const buyA = a.buy ?? a.cost ?? 0, curA = a.current ?? a.price ?? buyA;
     const buyB = b.buy ?? b.cost ?? 0, curB = b.current ?? b.price ?? buyB;
@@ -1836,12 +1850,13 @@ function render() {
     const pnlB = buyB > 0 ? (curB - buyB) * (parseFloat(b.qty)||1) : 0;
     const rateA = buyA > 0 ? (curA - buyA) / buyA : 0;
     const rateB = buyB > 0 ? (curB - buyB) / buyB : 0;
-    if (sortKey === 'name')     return (a.name||'').localeCompare(b.name||'', 'ja');
-    if (sortKey === 'pnl_desc') return pnlB - pnlA;
-    if (sortKey === 'pnl_asc')  return pnlA - pnlB;
+    if (sortKey === 'signal')    return signalPriority(a) - signalPriority(b);
+    if (sortKey === 'name')      return (a.name||'').localeCompare(b.name||'', 'ja');
+    if (sortKey === 'pnl_desc')  return pnlB - pnlA;
+    if (sortKey === 'pnl_asc')   return pnlA - pnlB;
     if (sortKey === 'rate_desc') return rateB - rateA;
     if (sortKey === 'rate_asc')  return rateA - rateB;
-    return (a.createdAt||0) - (b.createdAt||0); // created（デフォルト）
+    return (a.createdAt||0) - (b.createdAt||0);
   });
   el.innerHTML=sorted.map(s=>{
     // ダッシュボードから同期された銘柄はフィールド名が異なる場合がある
