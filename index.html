@@ -488,6 +488,41 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
   </div>
 </div>
 
+<!-- 履歴編集モーダル（全履歴共通） -->
+<div class="modal" id="editHistoryModal">
+  <div class="modal-inner">
+    <div class="modal-title">✏️ 決済記録を編集</div>
+    <div id="eh-stock-info" style="background:var(--surface2);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:600"></div>
+    <div class="row row2">
+      <div class="fg"><label>決済日</label><input id="eh-date" type="text" inputmode="numeric" placeholder="例: 20260604" oninput="_formatDateLive(this)"></div>
+      <div class="fg"><label>売値</label><input id="eh-price" type="number" step="any" placeholder="約定価格"></div>
+    </div>
+    <div class="row row1">
+      <div class="fg">
+        <label>売った理由</label>
+        <div id="eh-reason-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+          <button type="button" class="reason-btn" data-value="💰 利確（目標到達）" onclick="selectEhReason(this)">💰 利確</button>
+          <button type="button" class="reason-btn" data-value="🔒 トレール（高値から下落）" onclick="selectEhReason(this)">🔒 トレール</button>
+          <button type="button" class="reason-btn" data-value="🚨 損切（ルール通り）" onclick="selectEhReason(this)">🚨 損切</button>
+          <button type="button" class="reason-btn" data-value="💥 前提崩壊（決算・材料）" onclick="selectEhReason(this)">💥 前提崩壊</button>
+          <button type="button" class="reason-btn" data-value="⏳ 時間切れ（塩漬け）" onclick="selectEhReason(this)">⏳ 時間切れ</button>
+          <button type="button" class="reason-btn" data-value="✏️ その他" onclick="selectEhReason(this)">✏️ その他</button>
+        </div>
+      </div>
+    </div>
+    <div class="row row1">
+      <div class="fg"><label>振り返りメモ（任意）</label><textarea id="eh-memo" placeholder="売った時の状況・感想など"></textarea></div>
+    </div>
+    <div class="row row1">
+      <div class="fg"><label>🔍 反省点・改善点（任意）</label><textarea id="eh-review" placeholder="次に活かしたいこと、反省点など"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sm btn-ghost" onclick="closeEditHistoryModal()">キャンセル</button>
+      <button class="btn btn-primary" style="width:auto;padding:10px 24px;" onclick="submitEditHistory()">保存する</button>
+    </div>
+  </div>
+</div>
+
 <!-- ライン引き上げモーダル -->
 <div class="modal" id="adjustModal">
   <div class="modal-inner">
@@ -1942,11 +1977,12 @@ function renderHistory() {
         <div class="sc-bar"><div class="sc-bar-label">株数</div><div class="sc-bar-val">${h.soldQty != null ? h.soldQty : (h.qty||'—')}株</div></div>
       </div>
       ${h.sellReason ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">📝 売った理由: ${h.sellReason}</div>` : ''}
-      ${h.sellMemo   ? `<div style="font-size:12px;color:var(--muted);margin-top:4px">💭 ${h.sellMemo}</div>` : ''}
-      <div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">
+      ${h.sellMemo   ? `<div style="font-size:12px;color:var(--muted);margin-top:4px">💭 振り返り: ${h.sellMemo}</div>` : ''}
+      ${h.sellReview ? `<div style="font-size:12px;color:var(--yellow);margin-top:4px">🔍 反省・改善点: ${h.sellReview}</div>` : ''}
+      <div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end;flex-wrap:wrap">
         <button onclick="toggleHistoryExclude('${h.id}')" style="font-size:11px;padding:3px 10px;border-radius:6px;background:${isExcluded?'rgba(74,222,154,.1)':'var(--surface2)'};border:1px solid ${isExcluded?'rgba(74,222,154,.3)':'var(--border)'};color:${isExcluded?'var(--green)':'var(--muted)'};cursor:pointer">${isExcluded?'✅ 統計に戻す':'📊 統計から除外'}</button>
-        ${h.manualEntry ? `<button onclick="editManualHistory('${h.id}')" style="font-size:11px;padding:3px 10px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);cursor:pointer">✏️ 編集</button>
-        <button onclick="deleteManualHistory('${h.id}')" style="font-size:11px;padding:3px 10px;border-radius:6px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--red);cursor:pointer">🗑 削除</button>` : ''}
+        <button onclick="openEditHistoryModal('${h.id}')" style="font-size:11px;padding:3px 10px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);cursor:pointer">✏️ 編集</button>
+        ${h.manualEntry ? `<button onclick="deleteManualHistory('${h.id}')" style="font-size:11px;padding:3px 10px;border-radius:6px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--red);cursor:pointer">🗑 削除</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -2738,6 +2774,58 @@ window.deleteAdjEntry = async (sid, idx) => {
   await saveStock(s);
   showToast('🗑 履歴を削除しました');
   showDetail(sid);
+};
+
+// ── 履歴編集（全件共通） ──
+let _editingHistoryId = null;
+window.openEditHistoryModal = (id) => {
+  const h = history.find(x => x.id === id);
+  if (!h) return;
+  _editingHistoryId = id;
+  document.getElementById('eh-stock-info').textContent = `${h.name}${h.code ? ' · ' + h.code : ''}`;
+  document.getElementById('eh-date').value = h.sellDate || '';
+  document.getElementById('eh-price').value = h.sellPrice || '';
+  document.getElementById('eh-memo').value = h.sellMemo || '';
+  document.getElementById('eh-review').value = h.sellReview || '';
+  document.querySelectorAll('#eh-reason-btns .reason-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.value === h.sellReason);
+  });
+  document.getElementById('editHistoryModal').classList.add('open');
+};
+window.closeEditHistoryModal = () => {
+  document.getElementById('editHistoryModal').classList.remove('open');
+  _editingHistoryId = null;
+};
+document.getElementById('editHistoryModal').addEventListener('click', e => {
+  // 枠外タップで閉じない（入力内容の誤消失防止）
+});
+window.selectEhReason = (btn) => {
+  document.querySelectorAll('#eh-reason-btns .reason-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+};
+window.submitEditHistory = async () => {
+  const h = history.find(x => x.id === _editingHistoryId);
+  if (!h) return;
+  const newPrice = parseFloat(document.getElementById('eh-price').value);
+  const newDate  = document.getElementById('eh-date').value;
+  const newReason = document.querySelector('#eh-reason-btns .reason-btn.selected')?.dataset?.value || h.sellReason || '';
+  const newMemo  = document.getElementById('eh-memo').value.trim();
+  const newReview = document.getElementById('eh-review').value.trim();
+  // P&L再計算（価格が変わった場合）
+  if (!isNaN(newPrice) && newPrice > 0) {
+    const buyP = h.buy ?? h.cost ?? 0;
+    const qty = h.soldQty ?? h.qty ?? null;
+    h.sellPrice = newPrice;
+    if (buyP > 0) h.plPct = parseFloat(((newPrice - buyP) / buyP * 100).toFixed(2));
+    if (qty && buyP > 0) h.plYen = Math.round((newPrice - buyP) * qty);
+  }
+  if (newDate) h.sellDate = newDate;
+  h.sellReason = newReason;
+  h.sellMemo   = newMemo;
+  h.sellReview = newReview;
+  await setDoc(doc(db, 'history', String(h.id)), h);
+  window.closeEditHistoryModal();
+  showToast('✅ 履歴を更新しました');
 };
 
 window.toggleHistoryExclude = async (id) => {
