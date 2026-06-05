@@ -2763,10 +2763,8 @@ function parseNomura(text, brokerName) {
 
     rows.push({ broker:brokerName, name, category, currency, ticker:ticker||code, qty, cost, price, nisa, memo:acct });
   }
-  if(!rows.length) throw new Error('野村證券CSV: インポート可能な銘柄が見つかりませんでした');
-
-  // MRF/お預り金をサマリー行（行5-7）から取得
-  // フォーマット: 行5: 商品分類,残高,...  行6: "MRF/お預り金","金額",...
+  // MRF/お預り金をサマリー行から取得（株式ゼロでも取り込む）
+  // フォーマット: "MRF/お預り金","金額",... の行がCSV上部にある
   for(let i=0;i<Math.min(lines.length,10);i++){
     const l=lines[i].trim(); if(!l) continue;
     const cols=parseCSVLine(l);
@@ -2781,6 +2779,8 @@ function parseNomura(text, brokerName) {
       }
     }
   }
+
+  if(!rows.length) throw new Error('野村證券CSV: インポート可能なデータが見つかりませんでした\n（MRF・株式・投信どれも見つかりませんでした）');
 
   return rows;
 }
