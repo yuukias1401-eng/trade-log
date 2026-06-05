@@ -673,7 +673,7 @@ onAuthStateChanged(auth, (user) => {
     // リアルタイム同期開始
     if (!_unsubStocks) {
       _unsubStocks = onSnapshot(stocksCol, (snapshot) => {
-        stocks = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        stocks = snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.settled);
         stocks.sort((a, b) => (a.createdAt||0) - (b.createdAt||0));
         render();
         setSyncStatus('ok');
@@ -747,7 +747,14 @@ async function saveStock(s) {
 }
 async function removeStock(id) {
   setSyncStatus('ing');
-  await deleteDoc(doc(db, 'watchlist', String(id)));
+  const s = stocks.find(s => String(s.id) === String(id));
+  if (s && s.fromDashboard) {
+    // ダッシュボード由来の銘柄は削除せず settled フラグを立てる
+    // （削除するとダッシュボード同期で復活してしまうため）
+    await setDoc(doc(db, 'watchlist', String(id)), { id: String(id), settled: true, settledAt: Date.now() });
+  } else {
+    await deleteDoc(doc(db, 'watchlist', String(id)));
+  }
 }
 
 // モーダル
@@ -1607,18 +1614,24 @@ function candCardHTML(c) {
     </div>
     <!-- 折りたたみ本体 -->
     <div id="cand-body-${c.id}" style="display:${isExpanded?'block':'none'}">
-      <div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">押し目買い5条件</div>
-      <div class="cond-list" style="gap:5px;margin-bottom:10px">${condHTML}</div>
+      <!-- チャートを最初に表示（メインコンテンツ） -->
+      <div id="cand-tv-${c.id}" style="min-height:240px;border-radius:8px;overflow:hidden;background:#131722;margin-bottom:10px" data-code="${(c.code||'').replace(/"/g,'&quot;')}" data-currency="${c.currency||'JPY'}">
+        <div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">📡 スクロールするとチャートをロード</div>
+      </div>
+      <!-- 5条件・加点条件・メモは折りたたみ -->
       <details style="margin-bottom:10px">
-        <summary style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:5px">▶ 加点条件</summary>
-        <div class="bonus-list" style="margin-top:8px;margin-bottom:0">${bonusHTML}</div>
+        <summary style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:5px;padding:6px 0">▶ 押し目買い5条件</summary>
+        <div style="margin-top:8px">
+          <div class="cond-list" style="gap:5px;margin-bottom:10px">${condHTML}</div>
+          <details style="margin-bottom:10px">
+            <summary style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.6px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:5px">▶ 加点条件</summary>
+            <div class="bonus-list" style="margin-top:8px;margin-bottom:0">${bonusHTML}</div>
+          </details>
+        </div>
       </details>
       <div style="margin-bottom:10px">
         <div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">メモ</div>
         <textarea style="font-size:13px;resize:none;min-height:52px" placeholder="メモ" onblur="updateCandMemo('${c.id}',this.value)">${(c.memo||'').replace(/</g,'&lt;')}</textarea>
-      </div>
-      <div id="cand-tv-${c.id}" style="min-height:240px;border-radius:8px;overflow:hidden;background:#131722;margin-bottom:10px" data-code="${(c.code||'').replace(/"/g,'&quot;')}" data-currency="${c.currency||'JPY'}">
-        <div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">📡 スクロールするとチャートをロード</div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button onclick="openBuyFromCandModal('${c.id}')" style="flex:1;padding:8px;border-radius:8px;background:rgba(74,222,154,.15);color:var(--green);border:1px solid rgba(74,222,154,.3);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">✅ 購入した</button>
