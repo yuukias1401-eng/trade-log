@@ -775,8 +775,16 @@ window._fbSyncWatchlist = async function(h) {
   try {
     var ref = window._db.collection('watchlist').doc(String(h.id));
     var snap = await ref.get();
-    // settled:true = トレードログ側で決済済み → 復活させない
-    if (snap.exists && snap.data().settled === true) return;
+    // settled:true = トレードログ側で決済済み
+    if (snap.exists && snap.data().settled === true) {
+      var settledCost = snap.data().settledCost || 0;
+      var currentCost = parseFloat(h.cost) || 0;
+      // 買値が1%以上変わっている場合 = 新しい取引（再購入） → settled フラグをクリアして再登録
+      var isNewTrade = settledCost > 0 && currentCost > 0 && Math.abs(currentCost - settledCost) / settledCost > 0.01;
+      if (!isNewTrade) return; // 同じ取引 → スキップ
+      // 新しい取引なので settled フラグをクリアして通常の同期処理を続ける
+      console.log('[watchlist sync] 新しい取引を検出（buy price changed）:', h.name, settledCost, '→', currentCost);
+    }
     var buy     = parseFloat(h.cost)  || null;  // h.cost = 取得単価（本当の購入価格）
     var current = parseFloat(h.price) || buy || 0; // h.price = 現在値
     if (!snap.exists) {
