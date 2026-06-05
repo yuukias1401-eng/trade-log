@@ -417,6 +417,21 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
       <div class="fg"><label>約定価格 *</label><input id="exec-price" type="number" placeholder="例: 3800" oninput="calcExecPL()"></div>
     </div>
     <div id="exec-pl-preview" style="display:none;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-weight:600;font-size:15px;"></div>
+    <div class="fg" style="margin-bottom:12px;">
+      <label>売った理由</label>
+      <div id="exec-reason-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+        <button type="button" class="reason-btn" data-value="💰 利確（目標到達）" onclick="selectExecReason(this)">💰 利確</button>
+        <button type="button" class="reason-btn" data-value="🔒 トレール（高値から下落）" onclick="selectExecReason(this)">🔒 トレール</button>
+        <button type="button" class="reason-btn" data-value="🚨 損切（ルール通り）" onclick="selectExecReason(this)">🚨 損切</button>
+        <button type="button" class="reason-btn" data-value="💥 前提崩壊（決算・材料）" onclick="selectExecReason(this)">💥 前提崩壊</button>
+        <button type="button" class="reason-btn" data-value="⏳ 時間切れ（塩漬け）" onclick="selectExecReason(this)">⏳ 時間切れ</button>
+        <button type="button" class="reason-btn" data-value="✏️ その他" onclick="selectExecReason(this)">✏️ その他</button>
+      </div>
+    </div>
+    <div class="fg" style="margin-bottom:12px;">
+      <label>振り返りメモ</label>
+      <textarea id="exec-memo" rows="2" placeholder="任意メモ" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>
+    </div>
     <div class="modal-footer">
       <button class="btn btn-sm btn-ghost" onclick="closeExecModal()">キャンセル</button>
       <button class="btn btn-primary" style="width:auto;padding:10px 24px;" onclick="submitExec()">✅ 約定を記録</button>
@@ -673,7 +688,7 @@ onAuthStateChanged(auth, (user) => {
     // リアルタイム同期開始
     if (!_unsubStocks) {
       _unsubStocks = onSnapshot(stocksCol, (snapshot) => {
-        stocks = snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.settled);
+        stocks = snapshot.docs.map(d => ({ id: d.id, ...d.data() })); // settled含む全件（カード側でバナー表示）
         stocks.sort((a, b) => (a.createdAt||0) - (b.createdAt||0));
         render();
         setSyncStatus('ok');
@@ -1340,6 +1355,10 @@ window.selectReason = (btn) => {
   document.querySelectorAll('#s-reason-btns .reason-btn').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
 };
+window.selectExecReason = (btn) => {
+  document.querySelectorAll('#exec-reason-btns .reason-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+};
 document.getElementById('settleModal').addEventListener('click', e => {
   if (e.target === document.getElementById('settleModal')) window.closeSettleModal();
 });
@@ -1449,6 +1468,8 @@ window.openExecModal = (stockId, orderId) => {
   document.getElementById('exec-date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('exec-price').value = order.limitPrice || (s.current ?? s.price ?? '');
   document.getElementById('exec-pl-preview').style.display = 'none';
+  document.querySelectorAll('#exec-reason-btns .reason-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('exec-memo').value = '';
   const buyP = s.buy ?? s.cost ?? 0;
   const ps = order.type === '指値' ? ` ｜ 指値 ¥${(order.limitPrice || 0).toLocaleString()}` : '';
   document.getElementById('exec-order-info').innerHTML = `
@@ -1490,7 +1511,7 @@ window.submitExec = async () => {
   const plPct = buyP > 0 ? ((sellPrice - buyP) / buyP * 100).toFixed(2) : '0.00';
   const plYen = order.qty ? Math.round((sellPrice - buyP) * order.qty) : null;
   const { pendingOrders: _po, ...sBase } = s;
-  const historyItem = { ...sBase, sellDate: window._isValidDate(document.getElementById('exec-date').value) ? document.getElementById('exec-date').value : '', sellPrice, sellReason: order.type === '指値' ? '📌 指値注文約定' : '📊 成行き注文約定', sellMemo: '', plPct: parseFloat(plPct), plYen, soldQty: order.qty, settledAt: Date.now() };
+  const historyItem = { ...sBase, sellDate: window._isValidDate(document.getElementById('exec-date').value) ? document.getElementById('exec-date').value : '', sellPrice, sellReason: document.querySelector('#exec-reason-btns .reason-btn.selected')?.dataset?.value || (order.type === '指値' ? '📌 指値注文約定' : '📊 成行き注文約定'), sellMemo: document.getElementById('exec-memo').value.trim(), plPct: parseFloat(plPct), plYen, soldQty: order.qty, settledAt: Date.now() };
   await setDoc(doc(db, 'history', String(s.id) + '_' + order.id), historyItem);
   s.pendingOrders = (s.pendingOrders || []).filter(o => String(o.id) !== String(order.id));
   const remainQty = s.qty ? s.qty - order.qty : null;
@@ -1682,16 +1703,47 @@ async function _initCandChart(id, code, currency) {
   let candles=null;
   try { await loadLightweightCharts(); candles=await fetchCandles(code, currency, '1d', '1y'); } catch(e){}
   if (!candles) { wrap.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">データ取得に失敗しました</div>'; return; }
+
   wrap.innerHTML='';
-  const chartEl=document.createElement('div'); chartEl.style.cssText='width:100%;height:240px;'; wrap.appendChild(chartEl);
-  const chart=LightweightCharts.createChart(chartEl,{width:chartEl.clientWidth,height:240,layout:{background:{color:'#131722'},textColor:'#d1d4dc'},grid:{vertLines:{color:'#1e222d'},horzLines:{color:'#1e222d'}},timeScale:{timeVisible:false,borderColor:'#2a2e39'},rightPriceScale:{borderColor:'#2a2e39'},crosshair:{mode:1}});
-  const series=chart.addCandlestickSeries({upColor:'#4ade9a',downColor:'#f87171',wickUpColor:'#4ade9a',wickDownColor:'#f87171',borderVisible:false});
+  const stateKey = 'cand-' + id;
+
+  const toolbar = document.createElement('div');
+  toolbar.style.cssText = 'display:flex;gap:4px;padding:6px 6px 4px;background:#131722;border-radius:8px 8px 0 0;';
+  TF_CONFIG.forEach(tf => {
+    const b = document.createElement('button');
+    b.textContent = tf.label;
+    b.dataset.tf = tf.interval;
+    b.style.cssText = 'padding:4px 10px;border-radius:6px;border:1px solid #2a2e39;background:transparent;color:#6b7185;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;min-width:42px;';
+    b.onclick = () => window.switchTF(stateKey, tf.interval);
+    toolbar.appendChild(b);
+  });
+  wrap.appendChild(toolbar);
+
+  const chartEl = document.createElement('div');
+  chartEl.style.cssText = 'width:100%;height:240px;border-radius:0 0 8px 8px;overflow:hidden';
+  wrap.appendChild(chartEl);
+
+  const chart = LightweightCharts.createChart(chartEl, {
+    width: chartEl.clientWidth, height: 240,
+    layout: { background: { color: '#131722' }, textColor: '#d1d4dc' },
+    grid: { vertLines: { color: '#1e222d' }, horzLines: { color: '#1e222d' } },
+    timeScale: { timeVisible: false, borderColor: '#2a2e39' },
+    rightPriceScale: { borderColor: '#2a2e39' },
+    crosshair: { mode: 1 },
+  });
+  const series = chart.addCandlestickSeries({ upColor: '#4ade9a', downColor: '#f87171', wickUpColor: '#4ade9a', wickDownColor: '#f87171', borderVisible: false });
   series.setData(candles);
-  const ma25s=chart.addLineSeries({color:'#60a5fa',lineWidth:1,priceLineVisible:false,lastValueVisible:true,title:'MA25'});
-  const ma75s=chart.addLineSeries({color:'#fb923c',lineWidth:1,priceLineVisible:false,lastValueVisible:true,title:'MA75'});
-  ma25s.setData(calcMA(candles,25)); ma75s.setData(calcMA(candles,75));
+  const ma25s = chart.addLineSeries({ color: '#60a5fa', lineWidth: 1, priceLineVisible: false, lastValueVisible: true, title: 'MA25' });
+  const ma75s = chart.addLineSeries({ color: '#fb923c', lineWidth: 1, priceLineVisible: false, lastValueVisible: true, title: 'MA75' });
+  ma25s.setData(calcMA(candles, 25));
+  ma75s.setData(calcMA(candles, 75));
   chart.timeScale().fitContent();
-  new ResizeObserver(()=>{ chart.applyOptions({width:chartEl.clientWidth}); }).observe(chartEl);
+
+  const cache = new Map([['1d', candles]]);
+  _chartState.set(stateKey, { chart, series, ma25series: ma25s, ma75series: ma75s, cache, toolbar, code, currency, buyDate: null, currentInterval: '1d', loading: false });
+  _updateTFButtons(toolbar, '1d');
+
+  new ResizeObserver(() => { chart.applyOptions({ width: chartEl.clientWidth }); }).observe(chartEl);
 }
 
 // インライン編集
