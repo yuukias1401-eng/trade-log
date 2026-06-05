@@ -821,13 +821,33 @@ window._fbSyncWatchlist = async function(h) {
 window._syncAllShortToWatchlist = async function() {
   if (!window._fbReady) return;
   var shorts = (holdings || []).filter(function(h) { return h.horizon === 'short'; });
-  if (!shorts.length) return;
   console.log('短期銘柄を一括同期中: ' + shorts.length + '件');
-  await Promise.all(shorts.map(function(h) {
-    return window._fbSyncWatchlist(h).catch(function(e) {
-      console.warn('watchlist sync failed for ' + h.name, e);
+  if (shorts.length > 0) {
+    await Promise.all(shorts.map(function(h) {
+      return window._fbSyncWatchlist(h).catch(function(e) {
+        console.warn('watchlist sync failed for ' + h.name, e);
+      });
+    }));
+  }
+  // settled ドキュメントの自動クリーンアップ:
+  // settled:true だが対応する短期保有がもう存在しない → ダッシュボード側が更新済みと判断 → 削除
+  try {
+    var shortIds = new Set(shorts.map(function(h){ return String(h.id); }));
+    var wSnap = await window._db.collection('watchlist').get();
+    var batch = window._db.batch();
+    var count = 0;
+    wSnap.docs.forEach(function(d) {
+      if (d.data().settled === true && !shortIds.has(d.id)) {
+        batch.delete(d.ref);
+        count++;
+        console.log('[settled cleanup] 削除:', d.data().name || d.id);
+      }
     });
-  }));
+    if (count > 0) {
+      await batch.commit();
+      console.log('[settled cleanup] ' + count + '件の決済済みカードを自動削除しました');
+    }
+  } catch(e) { console.warn('[settled cleanup] error:', e); }
   console.log('短期銘柄の同期完了');
 };
 

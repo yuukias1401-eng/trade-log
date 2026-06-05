@@ -2499,7 +2499,14 @@ function render() {
     const signBadgeHTML = _sign
       ? `<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;background:${_sign.bg};color:${_sign.color};border:1px solid ${_sign.border}">${_sign.label}</span>`
       : '';
-    return `<div class="stock-card">
+    return `<div class="stock-card" style="${s.settled?'opacity:.6':''}">
+      ${s.settled?`<div style="display:flex;align-items:center;gap:8px;background:rgba(74,222,154,.08);border:1px solid rgba(74,222,154,.25);border-radius:8px;padding:8px 12px;margin-bottom:8px">
+        <span style="font-size:13px">✅</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:var(--green)">決済済み</div>
+          <div style="font-size:10px;color:var(--muted)">ダッシュボードで短期タグを外すと自動で消えます</div>
+        </div>
+      </div>`:''}
       <!-- ▼ 常時表示ヘッダー（タップで展開） -->
       <div onclick="toggleCardExpand('${s.id}')" style="cursor:pointer">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
