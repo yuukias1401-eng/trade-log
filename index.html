@@ -801,8 +801,12 @@ async function removeStock(id) {
   if (s && s.fromDashboard) {
     // ダッシュボード由来の銘柄は削除せず settled フラグを立てる
     // （削除するとダッシュボード同期で復活してしまうため）
-    // settledCost を記録しておく（将来の再購入時に「新しい取引か」を判定するため）
-    await setDoc(doc(db, 'watchlist', String(id)), { id: String(id), settled: true, settledAt: Date.now(), settledCost: s.buy ?? s.cost ?? null });
+    // 銘柄名・settledCostを保存（カード表示用＆再購入判定用）
+    await setDoc(doc(db, 'watchlist', String(id)), {
+      id: String(id), settled: true, settledAt: Date.now(),
+      settledCost: s.buy ?? s.cost ?? null,
+      name: s.name || '', code: s.code || s.ticker || ''
+    });
   } else {
     await deleteDoc(doc(db, 'watchlist', String(id)));
   }
@@ -2542,6 +2546,7 @@ function render() {
           <div style="font-size:12px;font-weight:600;color:var(--green)">決済済み</div>
           <div style="font-size:10px;color:var(--muted)">ダッシュボードで短期タグを外すと自動で消えます</div>
         </div>
+        <button onclick="deleteStock('${s.id}')" style="padding:4px 10px;border-radius:6px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--red);font-size:11px;cursor:pointer;flex-shrink:0">今すぐ削除</button>
       </div>`:''}
       <!-- ▼ 常時表示ヘッダー（タップで展開） -->
       <div onclick="toggleCardExpand('${s.id}')" style="cursor:pointer">
