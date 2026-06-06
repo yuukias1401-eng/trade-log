@@ -198,6 +198,7 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
   <button class="tab-btn active" id="tab-btn-watch"      onclick="switchTab('watch')">📈 ウォッチ</button>
   <button class="tab-btn"        id="tab-btn-history"    onclick="switchTab('history')">📋 履歴</button>
   <button class="tab-btn"        id="tab-btn-stats"      onclick="switchTab('stats')">📊 統計</button>
+  <button class="tab-btn"        id="tab-btn-chart"      onclick="switchTab('chart')">📊 チャート</button>
 </nav>
 
 <div class="container" id="tab-candidates" style="display:none">
@@ -241,6 +242,19 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 
 <div class="container" id="tab-stats" style="display:none">
   <div id="statsview"></div>
+</div>
+
+<div class="container" id="tab-chart" style="display:none;padding-top:8px">
+  <div style="margin-bottom:10px">
+    <select id="main-chart-select" onchange="loadMainChart()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 10px;color:var(--text);font-size:13px;font-family:inherit;">
+      <option value="">-- 銘柄を選択 --</option>
+    </select>
+  </div>
+  <div id="main-chart-area">
+    <div style="padding:30px 20px;text-align:center;color:var(--muted);font-size:13px;background:#131722;border-radius:12px">
+      ↑ 銘柄を選んでください
+    </div>
+  </div>
 </div>
 
 <!-- 銘柄追加モーダル -->
@@ -671,7 +685,7 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
@@ -727,6 +741,7 @@ onAuthStateChanged(auth, (user) => {
         stocks.sort((a, b) => (a.createdAt||0) - (b.createdAt||0));
         render();
         setSyncStatus('ok');
+        _cleanupOrphanWatchlist();
       }, () => setSyncStatus('err'));
     }
     if (!_unsubHistory) {
@@ -780,7 +795,7 @@ onAuthStateChanged(auth, (user) => {
 let activeTab = 'watch';
 window.switchTab = (tab) => {
   activeTab = tab;
-  ['candidates','watch','history','stats'].forEach(t => {
+  ['candidates','watch','history','stats','chart'].forEach(t => {
     document.getElementById('tab-'+t).style.display = t===tab ? '' : 'none';
     document.getElementById('tab-btn-'+t).classList.toggle('active', t===tab);
   });
@@ -789,7 +804,26 @@ window.switchTab = (tab) => {
   if(tab==='history') renderHistory();
   if(tab==='stats') renderStats();
   if(tab==='candidates') renderCandidates();
+  if(tab==='chart') _populateChartSelect();
 };
+
+let _orphanCleanupDone = false;
+async function _cleanupOrphanWatchlist() {
+  if (_orphanCleanupDone) return;
+  _orphanCleanupDone = true;
+  try {
+    const snap = await getDocs(stocksCol);
+    const activeIds = new Set(stocks.map(s => String(s.id)));
+    const toDelete = snap.docs.filter(d => {
+      const data = d.data();
+      return data.fromDashboard === true && !data.settled && !activeIds.has(d.id);
+    });
+    if (toDelete.length > 0) {
+      await Promise.all(toDelete.map(d => deleteDoc(doc(db, 'watchlist', d.id))));
+      showToast(`🧹 不要なカード ${toDelete.length}件を自動削除しました`);
+    }
+  } catch(e) { console.warn('[orphan cleanup]', e); }
+}
 
 async function saveStock(s) {
   setSyncStatus('ing');
@@ -2188,6 +2222,27 @@ function calcMA(candles, period) {
   }).filter(Boolean);
 }
 
+function calcRSI(candles, period = 14) {
+  if (candles.length < period + 1) return [];
+  const result = [];
+  let avgGain = 0, avgLoss = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = candles[i].close - candles[i - 1].close;
+    if (diff > 0) avgGain += diff; else avgLoss -= diff;
+  }
+  avgGain /= period; avgLoss /= period;
+  const rs0 = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  result.push({ time: candles[period].time, value: parseFloat((100 - 100 / (1 + rs0)).toFixed(2)) });
+  for (let i = period + 1; i < candles.length; i++) {
+    const diff = candles[i].close - candles[i - 1].close;
+    avgGain = (avgGain * (period - 1) + Math.max(diff, 0)) / period;
+    avgLoss = (avgLoss * (period - 1) + Math.max(-diff, 0)) / period;
+    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    result.push({ time: candles[i].time, value: parseFloat((100 - 100 / (1 + rs)).toFixed(2)) });
+  }
+  return result;
+}
+
 window.switchTF = async (id, interval) => {
   const state = _chartState.get(String(id));
   if (!state || state.loading) return;
@@ -2204,6 +2259,8 @@ window.switchTF = async (id, interval) => {
     state.series.setData(cached);
     state.ma25series?.setData(calcMA(cached, 25));
     state.ma75series?.setData(calcMA(cached, 75));
+    state.rsiSeries?.setData(calcRSI(cached));
+    state.rsiChart?.timeScale().fitContent();
     state.chart.applyOptions({ timeScale: { timeVisible: tf.timeVisible } });
     state.chart.timeScale().fitContent();
     _applyBuyMarker(state.series, state.buyDate, cached, _isId(interval));
@@ -2230,10 +2287,131 @@ window.switchTF = async (id, interval) => {
   state.series.setData(candles);
   state.ma25series?.setData(calcMA(candles, 25));
   state.ma75series?.setData(calcMA(candles, 75));
+  state.rsiSeries?.setData(calcRSI(candles));
+  state.rsiChart?.timeScale().fitContent();
   state.chart.applyOptions({ timeScale: { timeVisible: tf.timeVisible } });
   state.chart.timeScale().fitContent();
   _applyBuyMarker(state.series, state.buyDate, candles, _isId(interval));
   state.currentInterval = interval;
+};
+
+function _populateChartSelect() {
+  const sel = document.getElementById('main-chart-select');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">-- 銘柄を選択 --</option>';
+  stocks.filter(s => !s.settled && (s.code || s.ticker)).forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = String(s.id);
+    opt.textContent = s.name + (s.code ? ` (${s.code})` : s.ticker ? ` (${s.ticker})` : '');
+    sel.appendChild(opt);
+  });
+  if (prev) sel.value = prev;
+}
+
+window.jumpToChart = (id) => {
+  window.switchTab('chart');
+  const sel = document.getElementById('main-chart-select');
+  if (sel) { sel.value = String(id); window.loadMainChart(); }
+};
+
+window.loadMainChart = async () => {
+  const sel = document.getElementById('main-chart-select');
+  const id = sel ? sel.value : '';
+  if (!id) return;
+  const s = stocks.find(s => String(s.id) === id);
+  if (!s) return;
+  const code = s.code ?? s.ticker ?? '';
+  const area = document.getElementById('main-chart-area');
+  if (!code) {
+    area.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;background:#131722;border-radius:12px">銘柄コードが設定されていません</div>';
+    return;
+  }
+  area.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;background:#131722;border-radius:12px">📡 チャートデータを取得中...</div>';
+
+  let initCandles = null;
+  try { await loadLightweightCharts(); initCandles = await fetchCandles(code, s.currency, '1d', '1y'); } catch(e) {}
+  if (!initCandles) {
+    area.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;background:#131722;border-radius:12px">データ取得に失敗しました</div>';
+    return;
+  }
+
+  area.innerHTML = '';
+
+  // ツールバー
+  const toolbar = document.createElement('div');
+  toolbar.style.cssText = 'display:flex;gap:4px;padding:6px 6px 4px;background:#131722;border-radius:12px 12px 0 0;';
+  TF_CONFIG.forEach(tf => {
+    const b = document.createElement('button');
+    b.textContent = tf.label;
+    b.dataset.tf = tf.interval;
+    b.style.cssText = 'padding:4px 10px;border-radius:6px;border:1px solid #2a2e39;background:transparent;color:#6b7185;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;min-width:42px;';
+    b.onclick = () => window.switchTF('main', tf.interval);
+    toolbar.appendChild(b);
+  });
+  area.appendChild(toolbar);
+
+  // メインチャートコンテナ
+  const mainEl = document.createElement('div');
+  mainEl.style.cssText = 'width:100%;height:450px;background:#131722;';
+  area.appendChild(mainEl);
+
+  // RSI コンテナ
+  const rsiEl = document.createElement('div');
+  rsiEl.style.cssText = 'width:100%;height:120px;background:#131722;border-radius:0 0 12px 12px;border-top:1px solid #1e222d;';
+  area.appendChild(rsiEl);
+
+  const chart = LightweightCharts.createChart(mainEl, {
+    width: mainEl.clientWidth, height: 450,
+    layout: { background: { color: '#131722' }, textColor: '#d1d4dc' },
+    grid: { vertLines: { color: '#1e222d' }, horzLines: { color: '#1e222d' } },
+    timeScale: { timeVisible: false, borderColor: '#2a2e39' },
+    rightPriceScale: { borderColor: '#2a2e39' },
+    crosshair: { mode: 1 },
+  });
+  const series = chart.addCandlestickSeries({ upColor: '#4ade9a', downColor: '#f87171', wickUpColor: '#4ade9a', wickDownColor: '#f87171', borderVisible: false });
+  series.setData(initCandles);
+  _applyBuyMarker(series, s.buyDate, initCandles, false);
+  const ma25series = chart.addLineSeries({ color: '#60a5fa', lineWidth: 1, priceLineVisible: false, lastValueVisible: true, title: 'MA25' });
+  const ma75series = chart.addLineSeries({ color: '#fb923c', lineWidth: 1, priceLineVisible: false, lastValueVisible: true, title: 'MA75' });
+  ma25series.setData(calcMA(initCandles, 25));
+  ma75series.setData(calcMA(initCandles, 75));
+  if (s.buy)    series.createPriceLine({ price: s.buy,    color: '#9ca3af', lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: '' });
+  if (s.target) series.createPriceLine({ price: s.target, color: '#60a5fa', lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: '' });
+  if (s.loss)   series.createPriceLine({ price: s.loss,   color: '#f87171', lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: '' });
+  chart.timeScale().fitContent();
+
+  // RSIチャート
+  const rsiChart = LightweightCharts.createChart(rsiEl, {
+    width: rsiEl.clientWidth, height: 120,
+    layout: { background: { color: '#131722' }, textColor: '#9ca3af' },
+    grid: { vertLines: { color: '#1e222d' }, horzLines: { color: '#1e222d' } },
+    timeScale: { timeVisible: false, borderColor: '#2a2e39' },
+    rightPriceScale: { borderColor: '#2a2e39', scaleMargins: { top: 0.1, bottom: 0.1 } },
+    crosshair: { mode: 1 },
+  });
+  const rsiSeries = rsiChart.addLineSeries({ color: '#a78bfa', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true, title: 'RSI(14)' });
+  rsiSeries.setData(calcRSI(initCandles, 14));
+  rsiSeries.createPriceLine({ price: 70, color: '#f87171', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '' });
+  rsiSeries.createPriceLine({ price: 30, color: '#4ade9a', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '' });
+  rsiChart.timeScale().fitContent();
+
+  // タイムスケール同期（メイン → RSI）
+  chart.timeScale().subscribeVisibleTimeRangeChange(() => {
+    const range = chart.timeScale().getVisibleRange();
+    if (range) rsiChart.timeScale().setVisibleRange(range);
+  });
+
+  // 状態キャッシュ
+  const cache = new Map([['1d', initCandles]]);
+  _chartState.set('main', { chart, series, ma25series, ma75series, rsiChart, rsiSeries, cache, toolbar, code, currency: s.currency, buyDate: s.buyDate, currentInterval: '1d', loading: false });
+  _updateTFButtons(toolbar, '1d');
+
+  // レスポンシブ
+  new ResizeObserver(() => {
+    chart.applyOptions({ width: mainEl.clientWidth });
+    rsiChart.applyOptions({ width: rsiEl.clientWidth });
+  }).observe(mainEl);
 };
 
 window.toggleChart = async (id) => {
@@ -2556,6 +2734,7 @@ function render() {
               ${url?`<a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;font-size:14px;flex-shrink:0;line-height:1">📈</a>`:''}
               <div class="sc-name" style="font-size:15px">${s.name}</div>
               ${stockCode?`<span style="font-size:10px;color:var(--muted);flex-shrink:0">${stockCode}</span>`:''}
+              ${stockCode?`<button onclick="event.stopPropagation();jumpToChart('${s.id}')" style="padding:2px 6px;border-radius:5px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:11px;cursor:pointer;font-family:inherit;flex-shrink:0;line-height:1.4">🔍</button>`:''}
               ${accountInline}
             </div>
             <div style="margin-top:2px;display:flex;align-items:center;gap:3px" onclick="event.stopPropagation()">
