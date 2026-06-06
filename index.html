@@ -1774,7 +1774,7 @@ async function _initCandChart(id, code, currency) {
   if (!code) { wrap.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">銘柄コードを登録するとチャートが表示されます</div>'; return; }
   wrap.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">📡 チャートデータを取得中...</div>';
   let candles=null;
-  try { await loadLightweightCharts(); candles=await fetchCandles(code, currency, '1d', '1y'); } catch(e){}
+  try { await loadLightweightCharts(); candles=await fetchCandles(code, currency, '1d', '2y'); } catch(e){}
   if (!candles) { wrap.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">データ取得に失敗しました</div>'; return; }
 
   wrap.innerHTML='';
@@ -2117,7 +2117,7 @@ function loadLightweightCharts() {
 const TF_CONFIG = [
   { label: '15分', interval: '15m', range: '5d',  timeVisible: true  },
   { label: '1時間', interval: '1h',  range: '1mo', timeVisible: true  },
-  { label: '日',   interval: '1d',  range: '1y',  timeVisible: false },
+  { label: '日',   interval: '1d',  range: '2y',  timeVisible: false },
   { label: '週',   interval: '1wk', range: '2y',  timeVisible: false },
   { label: '月',   interval: '1mo', range: '5y',  timeVisible: false },
 ];
@@ -2126,7 +2126,7 @@ const DEFAULT_TF = '1d';
 const _chartState = new Map();
 
 // Yahoo Finance から指定足のローソク足を取得（既存PROXIES方式）
-async function fetchCandles(code, currency, interval = '1d', range = '1y') {
+async function fetchCandles(code, currency, interval = '1d', range = '2y') {
   if (!code) return null;
   const isIntraday = interval === '15m' || interval === '1h';
   let syms;
@@ -2330,7 +2330,7 @@ window.loadMainChart = async () => {
   area.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;background:#131722;border-radius:12px">📡 チャートデータを取得中...</div>';
 
   let initCandles = null;
-  try { await loadLightweightCharts(); initCandles = await fetchCandles(code, s.currency, '1d', '1y'); } catch(e) {}
+  try { await loadLightweightCharts(); initCandles = await fetchCandles(code, s.currency, '1d', '2y'); } catch(e) {}
   if (!initCandles) {
     area.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;background:#131722;border-radius:12px">データ取得に失敗しました</div>';
     return;
@@ -2439,7 +2439,7 @@ window.toggleChart = async (id) => {
   let initCandles = null;
   try {
     await loadLightweightCharts();
-    initCandles = await fetchCandles(code, s.currency, DEFAULT_TF, '1y');
+    initCandles = await fetchCandles(code, s.currency, DEFAULT_TF, '2y');
   } catch (e) {}
 
   if (!initCandles) { wrap.innerHTML = fallbackLinksHTML(m); return; }
