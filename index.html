@@ -185,6 +185,7 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
   <div class="header-right">
     <span class="sync-status sync-ing" id="syncStatus">⏳ 接続中...</span>
     <span id="userInfo" style="font-size:10px;color:var(--muted);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle"></span>
+    <span id="fxRateDisplay" style="font-size:10px;color:var(--muted);white-space:nowrap"></span>
     <button onclick="googleSignOut()" style="font-size:10px;padding:3px 8px;border-radius:6px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer" title="ログアウト">🚪</button>
     <a href="dashboard.html" class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 10px;text-decoration:none">📊 ダッシュボード</a>
     <button class="btn btn-sm btn-ghost" onclick="document.getElementById('importFile').click()" style="font-size:11px;padding:4px 10px;">📥 インポート</button>
@@ -734,6 +735,8 @@ onAuthStateChanged(auth, (user) => {
     document.getElementById('loginOverlay').style.display = 'none';
     const ui = document.getElementById('userInfo');
     if(ui) ui.textContent = user.displayName || user.email || '';
+    _renderFxDisplay(_getFxRates()); // キャッシュを即反映
+    fetchFxRates().catch(console.warn); // バックグラウンド取得
     // リアルタイム同期開始
     if (!_unsubStocks) {
       _unsubStocks = onSnapshot(stocksCol, (snapshot) => {
@@ -996,6 +999,7 @@ window.updateAllPrices = async () => {
     const price=await fetchYahooPrice(s.code, s.currency);
     if(price){ s.current=price; s.updatedAt=new Date().toLocaleString('ja-JP'); await saveStock(s); ok++; } else fail++;
   }));
+  fetchFxRates().catch(console.warn);
   showToast(fail===0?`✅ ${ok}件すべて取得成功`:`✅ ${ok}件成功 / ❌ ${fail}件失敗`,fail>0&&ok===0);
 };
 
@@ -1007,6 +1011,37 @@ window.updateOnePrice = async (id) => {
   if(price){ s.current=price; s.updatedAt=new Date().toLocaleString('ja-JP'); await saveStock(s); showToast(`✅ ${s.name}: ¥${price.toLocaleString()}`); }
   else{ showToast(`❌ 取得失敗。手動入力します`,true); setTimeout(()=>window.promptPrice(id),1000); }
 };
+
+// ── 為替レート取得・表示 ──────────────────────
+function _renderFxDisplay(fx) {
+  const el = document.getElementById('fxRateDisplay');
+  if (!el) return;
+  if (!fx.USD && !fx.HKD) { el.textContent = ''; return; }
+  const usd = fx.USD ? `$${fx.USD.toFixed(1)}` : '$—';
+  const hkd = fx.HKD ? `HK$${fx.HKD.toFixed(1)}` : 'HK$—';
+  let timeStr = '';
+  if (fx.updatedAt) {
+    const d = new Date(fx.updatedAt);
+    timeStr = ` | 最終更新 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+  el.textContent = `💱 ${usd} | ${hkd}${timeStr}`;
+}
+async function fetchFxRates() {
+  const pairs = [{ sym: 'USDJPY=X', key: 'USD' }, { sym: 'HKDJPY=X', key: 'HKD' }];
+  const rates = {};
+  await Promise.all(pairs.map(async ({ sym, key }) => {
+    const price = await fetchYahooPrice(sym);
+    if (price && price > 0) rates[key] = price;
+  }));
+  if (Object.keys(rates).length > 0) {
+    const existing = _getFxRates();
+    const updated = { ...existing, ...rates, updatedAt: Date.now() };
+    localStorage.setItem('portfolio_v6_fx', JSON.stringify(updated));
+    _renderFxDisplay(updated);
+  } else {
+    _renderFxDisplay(_getFxRates());
+  }
+}
 
 const COND_LABELS=['① 上昇トレンド確認（75日線上向き・株価が75日線の上）','② 押し目が来ている（直近高値から5〜15%下落・25日線付近）','③ 反転サイン（陽線1〜3本＋出来高増加）','④ 過熱していない（RSI 70以下）','⑤ 相場環境が良い（VIX 20以下）'];
 const BONUS_LABELS=['直近決算が予想超え','明確な材料・テーマがある','出来高が20日平均の1.5倍以上','決算発表の2週間前後を避ける（確認済み）'];
@@ -1968,8 +2003,16 @@ function renderHistory() {
   }
   // 確定損益サマリー（除外フラグのないものだけ集計）
   const included = history.filter(h => !h.excluded);
-  const totalPL    = included.reduce((s, h) => s + (h.plYen || 0), 0);
-  const totalPLAll = history.reduce((s, h) => s + (h.plYen || 0), 0); // 除外含む全件
+  const fx = _getFxRates();
+  const _toJPYSum = h => {
+    if (h.plYen == null) return 0;
+    const cur = (h.currency || 'JPY').toUpperCase();
+    if (cur === 'USD' && fx.USD) return Math.round(h.plYen * fx.USD);
+    if (cur === 'HKD' && fx.HKD) return Math.round(h.plYen * fx.HKD);
+    return h.plYen;
+  };
+  const totalPL    = included.reduce((s, h) => s + _toJPYSum(h), 0);
+  const totalPLAll = history.reduce((s, h) => s + _toJPYSum(h), 0); // 除外含む全件
   const wins    = included.filter(h => (h.plPct || 0) >= 0).length;
   const losses  = included.length - wins;
   const excCount = history.length - included.length;
@@ -1999,7 +2042,17 @@ function renderHistory() {
     const plSign = isWin ? '+' : '';
     const plColor = isWin ? 'var(--green)' : 'var(--red)';
     const sym = _currSym(h.currency || 'JPY');
-    const plYenBig = h.plYen != null ? `${plSign}${sym}${h.plYen.toLocaleString()}` : `${plSign}${h.plPct}%`;
+    const cur = (h.currency || 'JPY').toUpperCase();
+    let jpyAnnotation = '';
+    if (h.plYen != null && cur !== 'JPY') {
+      const rate = cur === 'USD' ? fx.USD : cur === 'HKD' ? fx.HKD : null;
+      if (rate) {
+        const jpyVal = Math.round(h.plYen * rate);
+        const jpySign = jpyVal >= 0 ? '+' : '';
+        jpyAnnotation = `<span style="font-size:13px;color:${plColor};opacity:0.75"> (≈${jpySign}¥${Math.abs(jpyVal).toLocaleString()})</span>`;
+      }
+    }
+    const plYenBig = h.plYen != null ? `${plSign}${sym}${h.plYen.toLocaleString()}${jpyAnnotation}` : `${plSign}${h.plPct}%`;
     const plPctSmall = h.plYen != null ? `${plSign}${h.plPct}%` : '';
     // 部分決済バッジ（soldQty が qty と異なる場合）
     const partialBadge = (h.soldQty != null && h.qty != null && h.soldQty !== h.qty)
