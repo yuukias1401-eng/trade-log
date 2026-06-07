@@ -401,9 +401,10 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
         <div class="fg">
           <label>売った理由</label>
           <div id="s-reason-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
-            <button type="button" class="reason-btn" data-value="💰 利確（目標到達）" onclick="selectReason(this)">💰 利確（目標到達）</button>
-            <button type="button" class="reason-btn" data-value="🔒 トレール（高値から下落）" onclick="selectReason(this)">🔒 トレール</button>
-            <button type="button" class="reason-btn" data-value="🚨 損切（ルール通り）" onclick="selectReason(this)">🚨 損切（ルール通り）</button>
+            <button type="button" class="reason-btn" data-value="💰 第1利確（+15%到達）" onclick="selectReason(this)">💰 第1利確</button>
+            <button type="button" class="reason-btn" data-value="📈 第2利確（+25%到達）" onclick="selectReason(this)">📈 第2利確</button>
+            <button type="button" class="reason-btn" data-value="🔒 トレール（高値-7%）" onclick="selectReason(this)">🔒 トレール</button>
+            <button type="button" class="reason-btn" data-value="🚨 損切（-5%ルール）" onclick="selectReason(this)">🚨 損切</button>
             <button type="button" class="reason-btn" data-value="💥 前提崩壊（決算・材料）" onclick="selectReason(this)">💥 前提崩壊</button>
             <button type="button" class="reason-btn" data-value="⏳ 時間切れ（塩漬け）" onclick="selectReason(this)">⏳ 時間切れ</button>
             <button type="button" class="reason-btn" data-value="✏️ その他" onclick="selectReason(this)">✏️ その他</button>
@@ -435,9 +436,10 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
     <div class="fg" style="margin-bottom:12px;">
       <label>売った理由</label>
       <div id="exec-reason-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
-        <button type="button" class="reason-btn" data-value="💰 利確（目標到達）" onclick="selectExecReason(this)">💰 利確</button>
-        <button type="button" class="reason-btn" data-value="🔒 トレール（高値から下落）" onclick="selectExecReason(this)">🔒 トレール</button>
-        <button type="button" class="reason-btn" data-value="🚨 損切（ルール通り）" onclick="selectExecReason(this)">🚨 損切</button>
+        <button type="button" class="reason-btn" data-value="💰 第1利確（+15%到達）" onclick="selectExecReason(this)">💰 第1利確</button>
+        <button type="button" class="reason-btn" data-value="📈 第2利確（+25%到達）" onclick="selectExecReason(this)">📈 第2利確</button>
+        <button type="button" class="reason-btn" data-value="🔒 トレール（高値-7%）" onclick="selectExecReason(this)">🔒 トレール</button>
+        <button type="button" class="reason-btn" data-value="🚨 損切（-5%ルール）" onclick="selectExecReason(this)">🚨 損切</button>
         <button type="button" class="reason-btn" data-value="💥 前提崩壊（決算・材料）" onclick="selectExecReason(this)">💥 前提崩壊</button>
         <button type="button" class="reason-btn" data-value="⏳ 時間切れ（塩漬け）" onclick="selectExecReason(this)">⏳ 時間切れ</button>
         <button type="button" class="reason-btn" data-value="✏️ その他" onclick="selectExecReason(this)">✏️ その他</button>
@@ -630,8 +632,11 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
       <div class="fg"><label>株数</label><input id="bc-qty" type="number" placeholder="例: 100"></div>
     </div>
     <div class="row row2">
-      <div class="fg"><label>目標価格</label><input id="bc-target" type="number" class="auto-filled" placeholder="自動入力"></div>
-      <div class="fg"><label>損切ライン</label><input id="bc-loss" type="number" class="auto-filled" placeholder="自動入力"></div>
+      <div class="fg"><label>目標価格（第1利確 +15%）</label><input id="bc-target" type="number" class="auto-filled" placeholder="自動入力"></div>
+      <div class="fg"><label>損切ライン（-5%）</label><input id="bc-loss" type="number" class="auto-filled" placeholder="自動入力"></div>
+    </div>
+    <div id="bc-rule-hint" style="display:none;font-size:11px;color:var(--muted);padding:4px 2px 8px;line-height:1.8">
+      🟡第1利確(+15%): <b id="bc-tgt1">—</b>　🟢第2利確(+25%): <b id="bc-tgt2">—</b>　🔵トレール: 高値記録後に算出
     </div>
     <div class="row row1">
       <div class="fg"><label>購入日</label><input id="bc-date" type="text" inputmode="numeric" placeholder="例: 20260604" oninput="_formatDateLive(this)"></div>
@@ -997,7 +1002,7 @@ window.updateAllPrices = async () => {
   let ok=0,fail=0;
   await Promise.all(targets.map(async s=>{
     const price=await fetchYahooPrice(s.code, s.currency);
-    if(price){ s.current=price; s.updatedAt=new Date().toLocaleString('ja-JP'); await saveStock(s); ok++; } else fail++;
+    if(price){ if(!s.highPrice||price>s.highPrice) s.highPrice=price; s.current=price; s.updatedAt=new Date().toLocaleString('ja-JP'); await saveStock(s); ok++; } else fail++;
   }));
   fetchFxRates().catch(console.warn);
   showToast(fail===0?`✅ ${ok}件すべて取得成功`:`✅ ${ok}件成功 / ❌ ${fail}件失敗`,fail>0&&ok===0);
@@ -1008,7 +1013,7 @@ window.updateOnePrice = async (id) => {
   if(!s.code){ window.promptPrice(id); return; }
   showToast(`📡 ${s.name} の株価を取得中...`);
   const price=await fetchYahooPrice(s.code, s.currency);
-  if(price){ s.current=price; s.updatedAt=new Date().toLocaleString('ja-JP'); await saveStock(s); showToast(`✅ ${s.name}: ¥${price.toLocaleString()}`); }
+  if(price){ if(!s.highPrice||price>s.highPrice) s.highPrice=price; s.current=price; s.updatedAt=new Date().toLocaleString('ja-JP'); await saveStock(s); showToast(`✅ ${s.name}: ¥${price.toLocaleString()}`); }
   else{ showToast(`❌ 取得失敗。手動入力します`,true); setTimeout(()=>window.promptPrice(id),1000); }
 };
 
@@ -1420,7 +1425,8 @@ window.openSettleModal = (id) => {
   document.querySelectorAll('#s-reason-btns .reason-btn').forEach(b => b.classList.remove('selected'));
   const _initSign = getSellSign(s);
   if (_initSign) {
-    const _defVal = _initSign.type === 'loss' ? '🚨 損切（ルール通り）' : _initSign.type === 'target' ? '💰 利確（目標到達）' : null;
+    const _typeMap = { loss:'🚨 損切（-5%ルール）', tgt1:'💰 第1利確（+15%到達）', tgt2:'📈 第2利確（+25%到達）', trail:'🔒 トレール（高値-7%）' };
+    const _defVal = _typeMap[_initSign.type] || null;
     if (_defVal) {
       const _defBtn = [...document.querySelectorAll('#s-reason-btns .reason-btn')].find(b => b.dataset.value === _defVal);
       if (_defBtn) _defBtn.classList.add('selected');
@@ -1922,6 +1928,7 @@ window.openBuyFromCandModal = (id) => {
   const c=candidates.find(c=>c.id===id); if(!c) return;
   document.getElementById('buy-cand-info').innerHTML=`<b>${c.name}</b>${c.code?' ('+c.code+')':''}`;
   ['bc-buy','bc-qty','bc-target','bc-loss'].forEach(k=>{const el=document.getElementById(k);if(el)el.value='';});
+  const _hint=document.getElementById('bc-rule-hint'); if(_hint) _hint.style.display='none';
   document.getElementById('bc-date').value=new Date().toISOString().slice(0,10);
   document.getElementById('buyFromCandModal').classList.add('open');
 };
@@ -1929,8 +1936,14 @@ window.closeBuyFromCandModal = () => {document.getElementById('buyFromCandModal'
 // 購入情報モーダルは枠外タップで閉じない（入力内容の誤消失防止）
 window.bcAutoFill = () => {
   const p=parseFloat(document.getElementById('bc-buy').value); if(!p||p<=0) return;
-  document.getElementById('bc-target').value=Math.round(p*1.10);
+  document.getElementById('bc-target').value=Math.round(p*1.15);
   document.getElementById('bc-loss').value=Math.round(p*0.95);
+  const hint=document.getElementById('bc-rule-hint');
+  if(hint){
+    document.getElementById('bc-tgt1').textContent='¥'+Math.round(p*1.15).toLocaleString();
+    document.getElementById('bc-tgt2').textContent='¥'+Math.round(p*1.25).toLocaleString();
+    hint.style.display='block';
+  }
 };
 window.confirmBuyFromCand = async () => {
   const c=candidates.find(c=>c.id===_buyingCandId); if(!c) return;
@@ -2571,15 +2584,19 @@ window.toggleChart = async (id) => {
 function getSellSign(s) {
   const buy = s.buy ?? s.cost ?? 0;
   const cur = s.current ?? s.price ?? buy;
-  if (!s.target || !s.loss || !buy) return null;
-  const ach    = (cur - buy) / (s.target - buy) * 100;
-  const toTgt  = (s.target - cur) / cur * 100;
-  const toLoss = (cur - s.loss) / cur * 100;
-  if (cur <= s.loss)   return { type:'loss',   label:`🚨 損切ライン割れ → ルール通り売り`,                color:'var(--red)',    bg:'rgba(248,113,113,.15)', border:'rgba(248,113,113,.3)' };
-  if (cur >= s.target) return { type:'target', label:`💰 利確圏 → 売り or 引き上げ判断`,                  color:'var(--green)',  bg:'rgba(74,222,154,.15)',  border:'rgba(74,222,154,.3)'  };
-  if (ach >= 80)       return { type:'near',   label:`🎯 利確接近（目標まで +${toTgt.toFixed(1)}%）`,     color:'var(--yellow)', bg:'rgba(250,204,21,.15)',  border:'rgba(250,204,21,.3)'  };
-  if (cur > buy)       return { type:'hold',   label:`📈 保有継続（目標まで +${toTgt.toFixed(1)}%）`,     color:'var(--blue)',   bg:'rgba(96,165,250,.15)',  border:'rgba(96,165,250,.3)'  };
-  return               { type:'watch',  label:`👀 様子見（損切まで -${toLoss.toFixed(1)}%）`, color:'var(--muted)', bg:'var(--surface2)',       border:'var(--border)'        };
+  if (!buy) return null;
+  const loss1  = buy * 0.95;
+  const tgt1   = buy * 1.15;
+  const tgt2   = buy * 1.25;
+  const trail  = s.highPrice ? s.highPrice * 0.93 : null;
+  const toTgt1 = ((tgt1 - cur) / cur * 100).toFixed(1);
+  const toLoss = ((cur - loss1) / cur * 100).toFixed(1);
+  if (cur <= loss1)          return { type:'loss',  label:`🚨 損切ライン割れ（-5%）`,           color:'var(--red)',    bg:'rgba(248,113,113,.15)', border:'rgba(248,113,113,.3)' };
+  if (cur >= tgt2)           return { type:'tgt2',  label:`📈 第2利確圏（+25%超え）`,           color:'var(--green)',  bg:'rgba(74,222,154,.15)',  border:'rgba(74,222,154,.3)'  };
+  if (cur >= tgt1)           return { type:'tgt1',  label:`💰 第1利確圏（+15%超え）`,           color:'var(--green)',  bg:'rgba(74,222,154,.15)',  border:'rgba(74,222,154,.3)'  };
+  if (trail && cur <= trail) return { type:'trail', label:`🔒 トレールライン割れ（高値-7%）`,   color:'var(--yellow)', bg:'rgba(250,204,21,.15)',  border:'rgba(250,204,21,.3)'  };
+  if (cur > buy)             return { type:'hold',  label:`📈 保有中（第1利確まで +${toTgt1}%）`, color:'var(--blue)',  bg:'rgba(96,165,250,.15)',  border:'rgba(96,165,250,.3)'  };
+  return                            { type:'watch', label:`👀 様子見（損切まで -${toLoss}%）`,   color:'var(--muted)', bg:'var(--surface2)',       border:'var(--border)'        };
 }
 
 const _expandedBars = new Set();
@@ -2779,6 +2796,12 @@ function render() {
     const signBadgeHTML = _sign
       ? `<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;background:${_sign.bg};color:${_sign.color};border:1px solid ${_sign.border}">${_sign.label}</span>`
       : '';
+    // ルール早見表（常時表示）
+    const _rLoss  = buyPrice > 0 ? Math.round(buyPrice * 0.95) : null;
+    const _rTgt1  = buyPrice > 0 ? Math.round(buyPrice * 1.15) : null;
+    const _rTgt2  = buyPrice > 0 ? Math.round(buyPrice * 1.25) : null;
+    const _rTrail = s.highPrice   ? Math.round(s.highPrice * 0.93) : null;
+    const ruleHTML = buyPrice > 0 ? `<div style="margin-top:5px;font-size:10px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px;line-height:1.6"><span>🔴損切 ¥${_rLoss.toLocaleString()}</span><span>🟡第1利確 ¥${_rTgt1.toLocaleString()}</span><span>🟢第2利確 ¥${_rTgt2.toLocaleString()}</span><span>${_rTrail?'🔵トレール ¥'+_rTrail.toLocaleString():'🔵トレール: 高値未記録'}</span></div>` : '';
     return `<div class="stock-card" style="${s.settled?'opacity:.6':''}">
       ${s.settled?`<div style="display:flex;align-items:center;gap:8px;background:rgba(74,222,154,.08);border:1px solid rgba(74,222,154,.25);border-radius:8px;padding:8px 12px;margin-bottom:8px">
         <span style="font-size:13px">✅</span>
@@ -2805,6 +2828,7 @@ function render() {
             </div>
             ${pnlHTML}
             <div style="margin-top:4px">${signBadgeHTML}</div>
+            ${ruleHTML}
           </div>
           <div style="text-align:right;flex-shrink:0">
             <button style="font-size:10px;padding:2px 7px;border-radius:5px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);cursor:pointer;margin-bottom:4px;display:block;margin-left:auto" onclick="event.stopPropagation();updateOnePrice('${s.id}')">📡 更新</button>
