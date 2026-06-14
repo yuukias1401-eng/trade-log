@@ -13,11 +13,11 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
 
-header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;}
-header h1{font-size:1.1rem;font-weight:700;color:var(--green);}
-.header-right{display:flex;align-items:center;gap:10px;}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 12px;}
+header h1{font-size:1.1rem;font-weight:700;color:var(--green);flex-shrink:0;white-space:nowrap;margin-right:auto;}
+.header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
 header span{font-size:11px;color:var(--muted);}
-.sync-status{font-size:11px;padding:3px 8px;border-radius:10px;font-weight:500;}
+.sync-status{font-size:11px;padding:3px 8px;border-radius:10px;font-weight:500;white-space:nowrap;flex-shrink:0;}
 .sync-ok{color:var(--green);background:rgba(74,222,154,.1);}
 .sync-err{color:var(--red);background:rgba(248,113,113,.1);}
 .sync-ing{color:var(--yellow);background:rgba(250,204,21,.1);}
@@ -148,6 +148,15 @@ input.auto-filled{border-color:var(--purple);background:rgba(167,139,250,.08);}
 @media(max-width:420px){
   .row3{grid-template-columns:1fr 1fr;}
   .sc-bars{grid-template-columns:1fr 1fr;}
+  /* ヘッダー: タイトルを1行目に独立、操作系は2行目に折り返して潰れないように */
+  header{padding:10px 14px;}
+  header h1{font-size:1.05rem;width:100%;margin-right:0;}
+  .header-right{width:100%;justify-content:flex-start;gap:6px 8px;}
+  #fxRateDisplay{order:1;width:100%;font-size:11px!important;}
+  #userInfo{max-width:120px!important;}
+  /* 2段ヘッダーとタブstickyの干渉を避ける: ヘッダーはスクロールで隠れ、タブを最上部に固定 */
+  header{position:relative;top:auto;}
+  .tabs{top:0;}
 }
 
 /* ── タブ ── */
@@ -2109,14 +2118,23 @@ function renderStats() {
     return;
   }
   const statsTarget = history.filter(h => !h.excluded); // 除外フラグのないものだけ統計対象
+  // 損益(plYen)はネイティブ通貨建てなので、為替で円換算してから集計・比較する
+  const fx = _getFxRates();
+  const _toJPYStat = h => {
+    if (h.plYen == null) return 0;
+    const cur = (h.currency || 'JPY').toUpperCase();
+    if (cur === 'USD' && fx.USD) return Math.round(h.plYen * fx.USD);
+    if (cur === 'HKD' && fx.HKD) return Math.round(h.plYen * fx.HKD);
+    return h.plYen;
+  };
   const wins   = statsTarget.filter(h => (h.plPct||0) >= 0);
   const losses = statsTarget.filter(h => (h.plPct||0) <  0);
   const winRate  = statsTarget.length ? (wins.length / statsTarget.length * 100).toFixed(1) : '0.0';
   const avgWin   = wins.length   ? (wins.reduce((s,h)=>s+(h.plPct||0),0)/wins.length).toFixed(2)   : '—';
   const avgLoss  = losses.length ? (losses.reduce((s,h)=>s+(h.plPct||0),0)/losses.length).toFixed(2) : '—';
-  const totalPL  = statsTarget.reduce((s,h) => s+(h.plYen||0), 0);
-  const best     = statsTarget.length ? statsTarget.reduce((a,b) => (a.plYen||0)>(b.plYen||0)?a:b) : null;
-  const worst    = statsTarget.length ? statsTarget.reduce((a,b) => (a.plYen||0)<(b.plYen||0)?a:b) : null;
+  const totalPL  = statsTarget.reduce((s,h) => s+_toJPYStat(h), 0);
+  const best     = statsTarget.length ? statsTarget.reduce((a,b) => _toJPYStat(a)>_toJPYStat(b)?a:b) : null;
+  const worst    = statsTarget.length ? statsTarget.reduce((a,b) => _toJPYStat(a)<_toJPYStat(b)?a:b) : null;
   const plColor  = totalPL >= 0 ? 'var(--green)' : 'var(--red)';
   el.innerHTML = `
     <div class="stat-grid">
@@ -2147,11 +2165,11 @@ function renderStats() {
       </div>
       <div class="summary-row">
         <span style="color:var(--muted);font-size:13px">🏆 最大利益</span>
-        <span style="font-size:13px;font-weight:600;color:var(--red)">${best.name} +${best.plPct}% ${best.plYen!=null?'(+¥'+best.plYen.toLocaleString()+')':''}</span>
+        <span style="font-size:13px;font-weight:600;color:var(--red)">${best.name} +${best.plPct}% ${best.plYen!=null?'(+¥'+_toJPYStat(best).toLocaleString()+')':''}</span>
       </div>
       <div class="summary-row">
         <span style="color:var(--muted);font-size:13px">💧 最大損失</span>
-        <span style="font-size:13px;font-weight:600;color:var(--green)">${worst.name} ${worst.plPct}% ${worst.plYen!=null?'(¥'+worst.plYen.toLocaleString()+')':''}</span>
+        <span style="font-size:13px;font-weight:600;color:var(--green)">${worst.name} ${worst.plPct}% ${worst.plYen!=null?'(¥'+_toJPYStat(worst).toLocaleString()+')':''}</span>
       </div>
     </div>`;
 }
